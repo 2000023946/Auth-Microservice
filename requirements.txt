@@ -1,2 +1,10 @@
-pytest 
+pytest
 pytest-mock
+bcrypt
+pyjwt
+pydantic[email]
+pydantic
+mysql-connector-python
+flask 
+python-dotenv
+redis
