@@ -36,6 +36,7 @@ Methods:
 Method	Description
 register(email, p1, p2) → UserDTO	Orchestrates registration: validates inputs, creates User, saves via Repo, returns UserDTO.
 login(email, password) → UserDTO	Fetches user info via Repo, verifies credentials, returns UserDTO.
+
 Class: TokenService
 
 Methods:
