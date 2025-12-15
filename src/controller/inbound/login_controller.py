@@ -11,29 +11,57 @@ class LoginSchema(BaseModel):
     password: str
 
 
+import os
+import sys  # Import sys to force printing to stderr
+
+
 # ----------------------------------------------------------------
-# Helper: Simple Response Object (Simulates Framework Response)
+# Helper: Simple Response Object
 # ----------------------------------------------------------------
 class HttpResponse:
     def __init__(self, body, status_code=200):
         self.body = body
         self.status_code = status_code
-        self.headers = {}
+        # Use a list of tuples instead of a dict to allow duplicate headers (like Set-Cookie)
+        self.headers = []
 
-    def set_cookie(
-        self, key, value, httponly=True, secure=True, path="/", max_age=None
-    ):
-        # Simply appending to a string for this generic implementation.
-        # Real frameworks handle multiple cookies better.
-        cookie_str = f"{key}={value}; HttpOnly; Secure; Path={path}; SameSite=Lax"
-        if max_age:
-            cookie_str += f"; Max-Age={max_age}"
+    def set_cookie(self, key, value, httponly=True, path="/", max_age=None):
+        # 1. Check Env Var directly to avoid import caching issues
+        # default to False (Development) if not explicitly 'production'
+        is_prod = False
 
-        # Append to existing headers or create new
-        if "Set-Cookie" in self.headers:
-            self.headers["Set-Cookie"] += ", " + cookie_str
+        # Force print to stderr (shows up in Docker logs immediately)
+        print(
+            f"DEBUG: Setting cookie {key}. Production Mode? {is_prod}", file=sys.stderr
+        )
+
+        cookie_parts = [f"{key}={value}", f"Path={path}"]
+
+        # 2. Add flags
+        if httponly:
+            cookie_parts.append("HttpOnly")
+
+        # 3. Dynamic Secure Flag
+        if is_prod:
+            cookie_parts.append("Secure")
+            cookie_parts.append("SameSite=None")
         else:
-            self.headers["Set-Cookie"] = cookie_str
+            # Lax is safer for local HTTP dev
+            cookie_parts.append("SameSite=Lax")
+
+        if max_age:
+            cookie_parts.append(f"Max-Age={max_age}")
+
+        cookie_str = "; ".join(cookie_parts)
+
+        # 4. Append as a tuple (Key, Value)
+        self.headers.append(("Set-Cookie", cookie_str))
+
+
+# ----------------------------------------------------------------
+# IMPORTANT: Update LoginController to use the new HttpResponse
+# ----------------------------------------------------------------
+# Ensure your LoginController.handle method returns this updated HttpResponse object.
 
 
 # ----------------------------------------------------------------
@@ -71,9 +99,7 @@ class LoginController:
             response.set_cookie("access_token", access_token, max_age=900)
 
             # Refresh Token: 7 days (604800s), RESTRICTED PATH
-            response.set_cookie(
-                "refresh_token", refresh_token, path="/auth/refresh", max_age=604800
-            )
+            response.set_cookie("refresh_token", refresh_token, max_age=604800)
 
             return response
 

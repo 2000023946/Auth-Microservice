@@ -10,6 +10,7 @@ class AppConfig:
         "password": os.getenv("DB_PASS", "password"),
         "host": os.getenv("DB_HOST", "localhost"),
         "database": os.getenv("DB_NAME", "auth_db"),
+        "port": int(os.getenv("DB_PORT", 3307)),
     }
 
     REDIS_HOST = os.getenv("REDIS_HOST", "localhost")

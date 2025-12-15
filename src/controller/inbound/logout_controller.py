@@ -44,7 +44,7 @@ class LogoutController:
 
             # 4. Clear Cookies (The "Logout" action in the browser)
             response.delete_cookie("access_token")
-            response.delete_cookie("refresh_token", path="/auth/refresh")
+            response.delete_cookie("refresh_token")
 
             return response
 

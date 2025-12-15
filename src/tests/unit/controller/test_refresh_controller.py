@@ -46,9 +46,20 @@ def test_refresh_success_rotates_tokens(refresh_controller, mock_token_service):
     assert response.status_code == 200
 
     # Verify Cookies
-    cookies = response.headers.get("Set-Cookie", "")
-    assert "access_token=new_access" in cookies
-    assert "refresh_token=new_refresh" in cookies
+    # --- UPDATED COOKIE ASSERTION (List Support) ---
+
+    # 1. Filter the list to find only 'Set-Cookie' headers
+    # response.headers is like: [('Set-Cookie', 'access=...'), ('Set-Cookie', 'refresh=...')]
+    cookie_values = [value for key, value in response.headers if key == "Set-Cookie"]
+
+    # 2. Join them into one string for easier checking
+    all_cookies_str = "".join(cookie_values)
+
+    # 3. Verify Both Tokens exist in the cookies
+    assert "access_token=new_access" in all_cookies_str
+    assert "refresh_token=new_refresh" in all_cookies_str
+
+    # Optional: Verify path and flags if you want to be strict
 
 
 # ----------------------------------------------------------------
