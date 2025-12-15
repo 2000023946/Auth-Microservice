@@ -17,7 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     
     # Ensures the job only runs if the DOCKER_PASSWORD secret is set
-    if: secrets.DOCKER_PASSWORD != '' 
 
     steps:
       - name: Checkout Code
