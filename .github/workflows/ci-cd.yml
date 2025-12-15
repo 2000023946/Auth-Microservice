@@ -42,7 +42,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           username: 2000023946 # the repo is public so its okay
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
