@@ -10,80 +10,108 @@ env:
   # Replace with your Docker Hub ID
   DOCKER_USERNAME: 2000023946
   DOCKER_IMAGE_NAME: 2000023946/auth-service
-  # Use the standard test environment file for secrets
   ENV_FILE: .env.test 
   
 jobs:
   test-and-deploy:
     runs-on: ubuntu-latest
     
-    # Ensures the job only runs if the secrets needed are available
+    # Ensures the job only runs if the DOCKER_PASSWORD secret is set
+    if: secrets.DOCKER_PASSWORD != '' 
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Setup Test Environment (using docker-compose)
-        # Use a temporary docker-compose file just for CI/CD testing
+      # CRITICAL: Step to ensure Docker Compose and Buildx are available
+      - name: Setup Docker Buildx and Compose
+        uses: docker/setup-buildx-action@v2
+
+      - name: Create .env.test file from Secrets
         run: |
-          # Create a dummy .env.test file for the action runner (since it doesn't have your local file)
+          # Inject SECRETS from GitHub for the environment file
           echo "FLASK_ENV=dev" >> ${{ env.ENV_FILE }}
           echo "DB_USER=${{ secrets.DB_USER }}" >> ${{ env.ENV_FILE }}
           echo "DB_PASS=${{ secrets.DB_PASS }}" >> ${{ env.ENV_FILE }}
           echo "DB_NAME=auth_db" >> ${{ env.ENV_FILE }}
           echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> ${{ env.ENV_FILE }}
-          
-          # Use docker-compose to build the application and start services (db, cache)
-          docker-compose -f docker-compose.yml --env-file ${{ env.ENV_FILE }} up -d --build
+          echo "DB_HOST=db" >> ${{ env.ENV_FILE }}
+          echo "REDIS_HOST=cache" >> ${{ env.ENV_FILE }}
+          echo "REDIS_PORT=6379" >> ${{ env.ENV_FILE }}
 
-      - name: Wait for App to be Ready
-        # Wait until the web server responds on port 5000
+      - name: Run Full Testing and Cleanup Sequence
         run: |
-          echo "Waiting for web service..."
-          # Install curl since it's not always default on all runners
+          echo "----------------------------------------------------"
+          echo "🚀 STARTING INFRASTRUCTURE..."
+          echo "----------------------------------------------------"
+
+          # 1. Start Docker containers (Builds the app image)
+          docker compose --env-file .env.test up -d --build
+
+          echo "⏳ Waiting for Auth Service to launch..."
+
+          RETRIES=0
+          # Install curl for the health check
           sudo apt-get update && sudo apt-get install -y curl
           
-          # Retry curl connection (10 times max, 5 seconds delay)
-          for i in $(seq 1 10); do
-            curl -s -o /dev/null http://localhost:5000/api/auth/me && echo "App is UP" && exit 0
+          # 2. Wait for the Server (5s delay, 10 attempts = 50s max wait)
+          until curl -s -o /dev/null "http://localhost:5000/api/auth/me" || [ $RETRIES -eq 10 ]; do
             sleep 5
+            ((RETRIES++))
+            echo -n "."
           done
-          echo "App did not start in time. Exiting."
-          exit 1
-        
-      - name: Run All Tests (Unit, Integration, Functional)
-        # We run the tests *inside* the app container using exec
-        # This ensures the tests run in the correct network context
-        run: |
-          docker-compose -f docker-compose.yml --env-file ${{ env.ENV_FILE }} exec -T app sh -c "
-            # Set unbuffered output for visibility
+          echo "" 
+
+          if [ $RETRIES -eq 10 ]; then
+              echo "❌ Timeout waiting for Docker! Exiting."
+              docker compose logs app
+              exit 1
+          fi
+
+          echo "✅ Docker is UP! Running Tests..."
+
+          # 3. Execute the custom Python test script inside the 'app' container
+          docker compose exec -T app sh -c "
             export PYTHONUNBUFFERED=1
-            
-            # Install pytest-cov in the container environment if needed (or rely on requirements.txt)
-            pip install pytest-cov || true
-            
-            # Run the full test suite (will exit with failure code if tests fail)
-            pytest src/tests/
+            # --- EXECUTE CUSTOM PYTHON TEST SCRIPT ---
+            python run_tests.py
           "
+          TEST_EXIT_CODE=$?
+
+          echo "----------------------------------------------------"
+          echo "🧹 CLEANING UP..."
+          echo "----------------------------------------------------"
+
+          # 4. Stop Containers (Uses the correct 'docker compose' syntax)
+          docker compose down -v 2>/dev/null
+
+          # 5. Check status (Final step before proceeding to deploy job)
+          if [ $TEST_EXIT_CODE -eq 0 ]; then
+              echo "✅ SUCCESS: All tests passed. Proceeding to deploy."
+          else
+              echo "❌ FAILURE: Some tests failed. Stopping deployment."
+              exit 1
+          fi
       
       - name: Login to Docker Hub
-        if: success() # Only log in if tests passed
+        if: success()
         uses: docker/login-action@v2
         with:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
           
       - name: Build and Push Final Image
-        if: success() # Only deploy if tests passed
-        # Use the standard Docker CLI for simplicity in CI/CD environments
+        if: success()
         run: |
-          # 1. Build the final image with the tag
+          echo "--- Pushing ${{ env.DOCKER_IMAGE_NAME }}:latest ---"
+          # 1. Build the final image 
           docker build -t ${{ env.DOCKER_IMAGE_NAME }}:latest .
           
           # 2. Push to Docker Hub
           docker push ${{ env.DOCKER_IMAGE_NAME }}:latest
 
-      - name: Cleanup Docker Containers
-        # Always run cleanup, even if tests fail
+      - name: Final Cleanup (Safety Net)
+        # This step is a safety net; the full cleanup should have happened inside the previous step.
         if: always()
         run: |
-          docker-compose -f docker-compose.yml --env-file ${{ env.ENV_FILE }} down -v
+          docker compose down -v 2>/dev/null || true
