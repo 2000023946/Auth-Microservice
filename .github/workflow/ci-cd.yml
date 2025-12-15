@@ -18,8 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     
     # Ensures the job only runs if the secrets needed are available
-    if: secrets.DOCKER_PASSWORD != '' 
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
