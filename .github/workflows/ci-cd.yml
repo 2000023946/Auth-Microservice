@@ -27,7 +27,7 @@ jobs:
         run: pytest src/tests/unit
 
       - name: Run integrated tests
-        run: pytest src/tests/integrated
+        run: pytest src/tests/integration
   
   push-to-dockerhub:
     name: Push to Docker Hub
