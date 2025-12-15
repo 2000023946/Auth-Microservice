@@ -1,87 +1,99 @@
-name: CI/CD Pipeline - Test & Deploy
+name: CI/CD Pipeline
 
-# Triggers on push to the 'main' branch
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ] 
+  pull_request:
+    branches: [ "main" ] 
 
-env:
-  # Replace with your Docker Hub ID
-  DOCKER_USERNAME: 2000023946
-  DOCKER_IMAGE_NAME: 2000023946/auth-service
-  # Use the standard test environment file for secrets
-  ENV_FILE: .env.test 
-  
 jobs:
-  test-and-deploy:
+  build-and-test:
+    name: Build, Lint, and Test
     runs-on: ubuntu-latest
     
-    # Ensures the job only runs if the DOCKER_PASSWORD secret is set
-    if: secrets.DOCKER_PASSWORD != '' 
+    # Check for essential secrets before running the test job
+    if: secrets.DB_PASS != '' && secrets.JWT_SECRET != ''
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      # CRITICAL FIX: Step to ensure Docker Compose and Buildx are available on the runner
-      - name: Setup Docker Buildx and Compose
-        uses: docker/setup-buildx-action@v2
-
-      - name: Setup Test Environment (using docker-compose)
-        # Create a temporary .env.test file for the action runner 
-        run: |
-          echo "FLASK_ENV=dev" >> ${{ env.ENV_FILE }}
-          echo "DB_USER=${{ secrets.DB_USER }}" >> ${{ env.ENV_FILE }}
-          echo "DB_PASS=${{ secrets.DB_PASS }}" >> ${{ env.ENV_FILE }}
-          echo "DB_NAME=auth_db" >> ${{ env.ENV_FILE }}
-          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> ${{ env.ENV_FILE }}
-          
-          # Use docker-compose to build the application and start services (db, cache)
-          # 'docker compose' is the new command, but the action should handle 'docker-compose'
-          docker-compose -f docker-compose.yml --env-file ${{ env.ENV_FILE }} up -d --build
-
-      - name: Wait for App to be Ready
-        # Wait until the web server responds on port 5000
-        run: |
-          echo "Waiting for web service..."
-          sudo apt-get update && sudo apt-get install -y curl
-          
-          # Retry curl connection to ensure the app is listening
-          for i in $(seq 1 10); do
-            curl -s -o /dev/null http://localhost:5000/api/auth/me && echo "App is UP" && exit 0
-            sleep 5
-          done
-          echo "App did not start in time. Exiting."
-          exit 1
+      - name: Checkout repository
+        uses: actions/checkout@v4
         
-      - name: Run All Tests (Unit, Integration, Functional)
-        # Run tests *inside* the app container
+      - name: Set up Docker Buildx (for build environment)
+        uses: docker/setup-buildx-action@v3
+        
+      # -----------------------------------------------------------
+      # SECURITY FIX: Create .env.test using GitHub Secrets
+      # We use environment variables for keys not present in the .env file
+      # -----------------------------------------------------------
+      - name: Create .env.test file from Secrets
         run: |
-          docker-compose -f docker-compose.yml --env-file ${{ env.ENV_FILE }} exec -T app sh -c "
-            export PYTHONUNBUFFERED=1
-            pip install pytest-cov || true
-            pytest src/tests/
-          "
-      
-      - name: Login to Docker Hub
-        if: success()
-        uses: docker/login-action@v2
-        with:
-          username: ${{ env.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          echo "FLASK_ENV=dev" >> .env.test
+          echo "DB_NAME=auth_db" >> .env.test
+          echo "DB_PORT=3306" >> .env.test
           
-      - name: Build and Push Final Image (Only if Tests Passed)
-        if: success()
-        run: |
-          # 1. Build the final image with the 'latest' tag
-          docker build -t ${{ env.DOCKER_IMAGE_NAME }}:latest .
+          # Inject SECRETS from GitHub
+          echo "DB_USER=${{ secrets.DB_USER }}" >> .env.test
+          echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env.test
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env.test
           
-          # 2. Push to Docker Hub
-          docker push ${{ env.DOCKER_IMAGE_NAME }}:latest
+          # Internal Docker network hosts
+          echo "WRITER_DB_HOST=db" >> .env.test
+          echo "READER_DB_HOST=db" >> .env.test
+          echo "REDIS_HOST=cache" >> .env.test
+          echo "REDIS_PORT=6379" >> .env.test
 
-      - name: Cleanup Docker Containers
-        # Always run cleanup, even if tests fail
-        if: always()
-        run: |
-          docker-compose -f docker-compose.yml --env-file ${{ env.ENV_FILE }} down -v
+      # -----------------------------------------------------------
+      # EXECUTION FIX: Start services before running tests or linting
+      # We need 'web', 'db', and 'cache' running before using 'docker compose run'
+      # -----------------------------------------------------------
+      - name: Build and Start Services for Testing
+        # This command builds all images and starts the db and cache containers
+        run: docker compose -f docker-compose.yml --env-file .env.test up -d --build
+        
+      # Step to wait for the database and app to be ready (Critical for functional tests)
+      - name: Wait for Services to be Healthy
+        uses: nev7n/wait_for_services@v1
+        with:
+          # Wait up to 120 seconds for the app port 5000 to be open
+          timeout: 120
+          host: localhost
+          port: 5000
+
+      - name: Lint with flake8
+        # We must use the full 'docker compose' command to specify the service to run against
+        run: docker compose run --rm app flake8 .
+
+      - name: Run tests and generate coverage report
+        # Assuming your docker-compose file defines a service named 'test' 
+        # that executes pytest, or if you use 'app' service to execute tests.
+        run: docker compose run --rm app pytest src/tests/ 
+        
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage_report.txt
+          
+  push-to-dockerhub:
+    name: Push to Docker Hub
+    needs: build-and-test
+    if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          # Note: Always use a variable for the image name for flexibility
+          tags: 2000023946/auth-app:latest
