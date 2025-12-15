@@ -48,7 +48,7 @@ jobs:
       # -----------------------------------------------------------
       - name: Build and Start Services for Testing
         # This command builds all images and starts the db and cache containers
-        run: docker compose -f docker-compose.yml --env-file .env.test up -d --build
+        run: docker compose -f docker-compose.yml --env-file ${{ env.ENV_FILE }} down -v
         
       # Step to wait for the database and app to be ready (Critical for functional tests)
       - name: Wait for Services to be Healthy
