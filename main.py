@@ -29,8 +29,18 @@ def flask_adapter(controller, flask_req):
     flask_res.status_code = internal_res.status_code
 
     # Map Headers (Set-Cookie)
-    for key, value in internal_res.headers.items():
-        flask_res.headers[key] = value
+    # NEW (Works with list of tuples)
+
+    # 4. Map Headers (Set-Cookie)
+    # Checks if headers is a dict (legacy) or list of tuples (new support for multiple cookies)
+    if isinstance(internal_res.headers, dict):
+        for k, v in internal_res.headers.items():
+            flask_res.headers[k] = v
+    else:
+        # This handles the list of tuples: [('Set-Cookie', '...'), ('Set-Cookie', '...')]
+        for k, v in internal_res.headers:
+            # .add() allows duplicate keys, which is required for multiple Set-Cookie headers
+            flask_res.headers.add(k, v)
 
     return flask_res
 
@@ -42,27 +52,27 @@ def flask_adapter(controller, flask_req):
 
 @app.route("/api/auth/register", methods=["POST"])
 def register():
-    return flask_adapter(container.register_controller, request)
+    return flask_adapter(container.controllers.register, request)
 
 
 @app.route("/api/auth/login", methods=["POST"])
 def login():
-    return flask_adapter(container.login_controller, request)
+    return flask_adapter(container.controllers.login, request)
 
 
 @app.route("/api/auth/refresh", methods=["POST"])
 def refresh():
-    return flask_adapter(container.refresh_controller, request)
+    return flask_adapter(container.controllers.refresh, request)
 
 
 @app.route("/api/auth/logout", methods=["POST"])
 def logout():
-    return flask_adapter(container.logout_controller, request)
+    return flask_adapter(container.controllers.logout, request)
 
 
 @app.route("/api/auth/me", methods=["GET"])
 def me():
-    return flask_adapter(container.silent_auth_controller, request)
+    return flask_adapter(container.controllers.silent_auth, request)
 
 
 # ==============================================================================
@@ -71,4 +81,4 @@ def me():
 
 if __name__ == "__main__":
     print("🚀 Auth Service is running on http://localhost:5000")
-    app.run(debug=True, port=5000)
+    app.run(host="0.0.0.0", debug=True, port=5000)

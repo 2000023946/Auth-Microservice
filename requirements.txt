@@ -8,3 +8,6 @@ mysql-connector-python
 flask 
 python-dotenv
 redis
+requests
+pymysql  # <--- CHANGE IMPORT
+pytest-cov

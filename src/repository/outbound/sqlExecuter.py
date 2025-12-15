@@ -1,5 +1,8 @@
 import mysql.connector
 
+# Ensure this matches the exception name used in your Controller!
+from src.app.domain.exceptions import EmailAlreadyExistsError
+
 
 class SqlExecutor:
     def __init__(self, db_config):
@@ -21,18 +24,27 @@ class SqlExecutor:
             # 1. Execute
             cursor.callproc(procedure_name, args)
 
-            # 2. Fetch Generated ID (if procedure returns one via SELECT LAST_INSERT_ID)
+            # 2. Fetch Generated ID
             for result in cursor.stored_results():
                 row = result.fetchone()
                 if row:
                     generated_id = row[0]
 
-            # 3. Commit (Crucial for writes)
+            # 3. Commit
             conn.commit()
             return generated_id
 
-        except mysql.connector.IntegrityError as e:
-            # Re-raise so Repo can handle business logic (duplicate email)
+        # CRITICAL FIX: Catch the base 'Error' class, not just IntegrityError.
+        # Custom signals (SQLSTATE 45000) often raise generic Errors.
+        except mysql.connector.Error as e:
+
+            error_msg = str(e).lower()
+
+            # Check for your custom signal OR the standard MySQL duplicate code (1062)
+            if "email already registered" in error_msg or e.errno == 1062:
+                raise EmailAlreadyExistsError("User with this email already exists")
+
+            # If it's a different error, let it crash (results in 500)
             raise e
 
         finally:
@@ -50,11 +62,10 @@ class SqlExecutor:
         try:
             cursor.callproc(procedure_name, args)
 
-            # Fetch the first result set
             for result in cursor.stored_results():
                 row = result.fetchone()
                 if row:
-                    return row  # Return raw DB tuple
+                    return row
 
             return None
 

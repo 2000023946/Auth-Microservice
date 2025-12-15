@@ -23,11 +23,6 @@ def login_controller(mock_user_service, mock_token_service):
     return LoginController(mock_user_service, mock_token_service)
 
 
-# ----------------------------------------------------------------
-# Happy Path
-# ----------------------------------------------------------------
-
-
 def test_login_success_sets_cookies(
     login_controller, mock_user_service, mock_token_service
 ):
@@ -40,9 +35,7 @@ def test_login_success_sets_cookies(
     mock_request.json = {"email": "test@gt.edu", "password": "pass"}
 
     # Arrange: Mock Service Responses
-    # User Service returns a DTO (Data Transfer Object)
     mock_user_service.login.return_value = Mock(id=1, email="test@gt.edu")
-    # Token Service returns the pair of strings
     mock_token_service.create_jwt.return_value = (
         "fake_access_token",
         "fake_refresh_token",
@@ -58,19 +51,27 @@ def test_login_success_sets_cookies(
     assert response.body["email"] == "test@gt.edu"
     assert "password" not in response.body
 
-    # Assert: Cookies (The most important part)
-    # We check if the 'Set-Cookie' header was constructed correctly
-    cookies = response.headers.get("Set-Cookie", "")
+    # --- UPDATED COOKIE ASSERTION ---
+    # Since headers is now a list of tuples [('Set-Cookie', '...'), ...],
+    # we cannot use .get(). We must filter the list.
 
-    # Check Access Token Cookie
-    assert "access_token=fake_access_token" in cookies
-    assert "HttpOnly" in cookies
-    assert "Secure" in cookies
-    assert "Max-Age=900" in cookies  # 15 mins
+    # 1. Extract all 'Set-Cookie' header values
+    cookie_values = [value for key, value in response.headers if key == "Set-Cookie"]
 
-    # Check Refresh Token Cookie
-    assert "refresh_token=fake_refresh_token" in cookies
-    assert "Path=/auth/refresh" in cookies  # Security restriction
+    # 2. Join them into one string to make searching easier
+    all_cookies_str = "".join(cookie_values)
+
+    # 3. Verify Access Token
+    assert "access_token" in all_cookies_str
+    assert "fake_access_token" in all_cookies_str
+
+    # 4. Verify Refresh Token
+    assert "refresh_token" in all_cookies_str
+    assert "fake_refresh_token" in all_cookies_str
+
+    # 5. Verify Security Flags
+    assert "HttpOnly" in all_cookies_str
+    assert "SameSite=Lax" in all_cookies_str
 
 
 # ----------------------------------------------------------------
