@@ -6,15 +6,24 @@ A **secure, scalable authentication microservice** designed with real-world back
 
 ## 🏗 Architecture & Layers
 
-The service follows a **Layered / Hexagonal Architecture** to ensure strong separation of concerns, testability, and long-term scalability.
+The service follows a **Hexagonal (Ports & Adapters) Architecture**, ensuring strong separation of concerns, testability, and long-term maintainability.
 
-| Layer          | Responsibility                                                                                                          |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| **Domain**     | Rich `User` models encapsulating business logic (password hashing, email & password validation).                        |
-| **Services**   | Orchestration layer (`UserService`, `TokenService`) handling workflows such as registration, login, and token rotation. |
-| **Repository** | `UserRepo` managing database persistence and credential validation via SQL procedures.                                  |
-| **Cache**      | `RedisCache` for session management and JWT JTI blacklisting.                                                           |
-| **Interface**  | Controllers acting as entry points with schema-based input validation and consistent JSON serialization.                |
+| Layer          | Responsibility                                                                                                               |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Domain**     | Rich `User` models encapsulating business rules (password hashing, email & password validation).                             |
+| **Services**   | Orchestration layer (`UserService`, `TokenService`) coordinating authentication workflows and enforcing use-case boundaries. |
+| **Repository** | `UserRepo` handling database persistence and credential validation via SQL.                                                  |
+| **Cache**      | `RedisCache` managing session state and JWT JTI blacklisting.                                                                |
+| **Interface**  | Controllers as HTTP entry points with schema-based input validation and consistent JSON serialization.                       |
+
+This architecture keeps business logic isolated from frameworks and infrastructure, enabling secure evolution as the system grows.
+
+------|---------------|
+| **Domain** | Rich `User` models encapsulating business logic (password hashing, email & password validation). |
+| **Services** | Orchestration layer (`UserService`, `TokenService`) handling workflows such as registration, login, and token rotation. |
+| **Repository** | `UserRepo` managing database persistence and credential validation via SQL procedures. |
+| **Cache** | `RedisCache` for session management and JWT JTI blacklisting. |
+| **Interface** | Controllers acting as entry points with schema-based input validation and consistent JSON serialization. |
 
 This structure isolates business rules from infrastructure, making the system easy to test, reason about, and evolve.
 
@@ -34,53 +43,44 @@ This structure isolates business rules from infrastructure, making the system ea
 
 ## 🔐 Security Design
 
-Security is a **first-class concern** in this service and influenced multiple architectural decisions:
+Security is treated as a **core system concern**, not an afterthought.
 
 * **JWTs stored in HTTP-only, Secure cookies**
-  Prevents access from JavaScript and mitigates XSS-based token theft compared to traditional localStorage-based JWTs.
+  Prevents JavaScript access and significantly reduces the risk of XSS-based token theft compared to localStorage-based JWTs.
 
 * **Access & Refresh Token Rotation**
-  Short-lived access tokens are paired with refresh tokens that are rotated on use, reducing the blast radius of token leakage.
+  Short-lived access tokens are paired with rotating refresh tokens to minimize the impact of token compromise.
 
 * **Redis-backed Token Blacklisting (JTI-based)**
-  Every rotated or logged-out token is invalidated by blacklisting its JTI, preventing replay and reuse.
+  Logged-out or rotated tokens are immediately invalidated server-side, preventing replay attacks.
 
 * **Explicit Logout Invalidation**
-  Sessions are immediately terminated server-side instead of relying solely on token expiration.
+  Sessions are terminated deterministically rather than relying solely on token expiration.
 
-* **SQL-based Persistence for User Data**
-  A relational database is intentionally used for user authentication data to ensure:
+* **Relational (SQL) Database for Identity Data**
+  A relational database is intentionally used for authentication data to ensure strong consistency, enforced constraints, and safer handling of critical user identity information.
 
-  * Strong consistency guarantees
-  * Enforced constraints (uniqueness, integrity)
-  * Safer handling of critical identity data compared to eventually-consistent NoSQL alternatives
-
-These choices reflect security patterns commonly used in production authentication systems.
+These mechanisms together reflect industry-standard practices used in production authentication systems.
 
 ---
 
 ## 📈 Scalability & Performance
 
-### Scalability Design
+The service is designed to scale horizontally with predictable performance under load.
 
-The service is designed to scale horizontally with minimal database contention:
+* **Redis-backed session caching**
+  User session payloads and token metadata are cached in Redis, avoiding repeated database access.
 
-* **Redis as a fast session cache**
-  User session payloads and token metadata are cached in Redis, allowing most authentication flows to avoid hitting the database.
+* **Constant-time token validation**
+  Redis provides *O(1)* lookups for token validation and blacklist checks, compared to *O(log n)* database queries.
 
-* **Constant-time lookups**
-  Redis provides *O(1)* access for token validation and blacklist checks, while database queries typically incur *O(log n)* costs. This significantly reduces latency under load.
+* **Hot-path optimization**
 
-* **Database hits are minimized**
+  * **Login**: single database lookup to validate credentials
+  * **Refresh Token (highest-frequency endpoint)**: Redis-only path, no database hit
+  * **Silent Auth**: Redis-backed validation without unnecessary persistence access
 
-  * **Login**: requires a single database lookup to validate credentials.
-  * **Refresh Token** (highest-frequency endpoint): served entirely from Redis without a database hit.
-  * **Silent Auth**: validates session state using cached payloads, avoiding unnecessary DB access.
-
-* **Refresh-heavy optimization**
-  Since token refresh is expected to be the most frequently called endpoint in real applications, eliminating database dependency here allows the service to scale efficiently as traffic grows.
-
-This design ensures predictable performance as concurrent users increase and enables horizontal scaling behind a load balancer.
+This design minimizes database contention and enables efficient horizontal scaling behind a load balancer.
 
 ---
 
@@ -93,13 +93,13 @@ This design ensures predictable performance as concurrent users increase and ena
 
 ### Load Testing Results
 
-Authentication flows were load tested under concurrent traffic. The following **p95 latencies** were observed:
+Authentication flows were load tested under concurrent traffic. Observed **p95 latencies**:
 
-* **Login**: ~0.5s (single DB lookup + token issuance)
-* **Refresh Token**: ~0.09s (Redis-only path)
-* **Silent Auth**: ~0.15s (Redis validation + lightweight processing)
+* **Login**: ~0.5s
+* **Refresh Token**: ~0.09s
+* **Silent Auth**: ~0.15s
 
-These results demonstrate the effectiveness of Redis-backed caching in reducing latency on high-frequency endpoints.
+These results demonstrate the effectiveness of Redis-backed caching on high-frequency endpoints.
 
 <img width="1414" height="529" alt="Load test latency dashboard" src="https://github.com/user-attachments/assets/a200616a-2ea8-4472-bf99-b66bf2124846" />
 <img width="981" height="225" alt="Request throughput under load" src="https://github.com/user-attachments/assets/61f1e8dd-3947-4860-85af-9766e50eb931" />
@@ -147,6 +147,29 @@ chmod +x run_tests.sh
 ```
 
 This spins up the API along with its database, Redis cache, and observability stack using Docker Compose.
+
+---
+
+## 🧩 Maintainability & Extensibility
+
+Maintainability is enforced through deliberate architectural boundaries and tooling.
+
+* **Strict separation of concerns**
+  Domain logic, orchestration, and infrastructure are isolated to prevent tight coupling.
+
+* **Framework-agnostic core**
+  Business logic does not depend on web frameworks or databases, enabling safe refactors and replacements.
+
+* **Explicit contracts between layers**
+  Controllers depend on services, services depend on interfaces, and infrastructure details remain interchangeable.
+
+* **High testability by design**
+  Most logic is unit-testable without external systems; infrastructure is covered via focused integration tests.
+
+* **CI-enforced quality gates**
+  Automated testing and coverage checks prevent architectural drift as the codebase evolves.
+
+This structure keeps the system understandable, extensible, and safe to modify as new features are added.
 
 ---
 
