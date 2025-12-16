@@ -19,17 +19,6 @@ The service follows a **Hexagonal (Ports & Adapters) Architecture**, ensuring st
 This architecture keeps business logic isolated from frameworks and infrastructure,
 enabling secure evolution as the system grows.
 
-| Layer        | Responsibility |
-|-------------|----------------|
-| **Domain**  | Rich `User` models encapsulating business logic (password hashing, email and password validation). |
-| **Services** | Orchestration layer (`UserService`, `TokenService`) coordinating workflows such as registration, login, and token rotation. |
-| **Repository** | `UserRepo` managing database persistence and credential validation via SQL procedures. |
-| **Cache** | `RedisCache` handling session state and JWT JTI blacklisting. |
-| **Interface** | Controllers acting as HTTP entry points with schema-based input validation and consistent JSON serialization. |
-
-This structure isolates business rules from infrastructure, making the system easy to test,
-reason about, and safely evolve over time.
-
 ---
 
 ## 🚀 Core Workflows (Use Cases)
@@ -107,13 +96,6 @@ These results demonstrate the effectiveness of Redis-backed caching on high-freq
 <img width="1414" height="529" alt="Load test latency dashboard" src="https://github.com/user-attachments/assets/a200616a-2ea8-4472-bf99-b66bf2124846" />
 <img width="981" height="225" alt="Request throughput under load" src="https://github.com/user-attachments/assets/61f1e8dd-3947-4860-85af-9766e50eb931" />
 
-### Code Quality
-
-### Metrics & Monitoring
-
-* Real-time request latency and error rates exposed via **Prometheus**
-* Visualized using **Grafana dashboards**
-
 ### Load Testing
 
 Authentication flows were tested under concurrent load to validate system behavior and latency characteristics.
@@ -123,7 +105,7 @@ Authentication flows were tested under concurrent load to validate system behavi
 
 ### Code Quality
 
-* Extensive unit and integration testing
+* Extensive unit and integration testing and functional testing
 * **93%+ automated test coverage** enforced during development
 
 <img width="987" height="536" alt="Test coverage report" src="https://github.com/user-attachments/assets/0ade94d1-be41-4f7a-93c1-afeba6ebe44e" />
