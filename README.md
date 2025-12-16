@@ -1,87 +1,45 @@
 User Authentication Service
 
-This service provides secure and scalable user authentication using JWTs, HTTP-only cookies, Redis, and asynchronous background jobs.
+A secure, scalable microservice managing user identity with JWTs, HTTP-only cookies, Redis, and asynchronous background jobs.
 
-Features
+🏗 Architecture & Layers
 
-Email-based user authentication
+The service follows a Layered Architecture to ensure clear separation of concerns:
 
-JWT + cookie–based session management
+Layer	Responsibility
+Domain	Rich User models encapsulating business logic (password hashing, input validation).
+Services	Orchestration layer (UserService, TokenService) handling workflows like login and registration.
+Repository	UserRepo managing database persistence and SQL procedures.
+Cache	RedisCache for session management and JWT blacklisting.
+Interface	Controllers with Zod input validation and Serializers for consistent JSON responses.
 
-Redis-backed token and session handling
+🚀 Core Workflows (Use Cases)
+Feature	Description
+Sign Up	Validates input, hashes password, creates a user, issues JWT, and enqueues asynchronous welcome email.
+Login	Verifies credentials, issues HTTP-only JWT cookie, and caches session in Redis.
+Silent Auth	Restores session on app load using HTTP-only cookie without re-entering credentials.
+Refresh Token	Rotates tokens for security, blacklists the old token in Redis, and issues a new token pair.
+Logout	Terminates session by blacklisting the JWT in Redis and clearing client cookies.
 
-Silent authentication for seamless user experience
+📊 Observability & Quality
 
-Asynchronous welcome email delivery
+Performance Metrics: Real-time request latency & error rates via Prometheus/Grafana.
 
-Authentication Flows
-1. Sign Up
+Load Testing Analysis: Throughput under high concurrency.
+<img width="1414" height="529" alt="Screenshot 2025-12-15 at 8 40 21 PM" src="https://github.com/user-attachments/assets/a200616a-2ea8-4472-bf99-b66bf2124846" />
 
-Endpoint behavior
+Code Quality: Target 93%+ test coverage.
+<img width="987" height="536" alt="Screenshot 2025-12-15 at 9 26 12 PM" src="https://github.com/user-attachments/assets/0ade94d1-be41-4f7a-93c1-afeba6ebe44e" />
+<img width="981" height="225" alt="Screenshot 2025-12-15 at 8 27 09 PM" src="https://github.com/user-attachments/assets/61f1e8dd-3947-4860-85af-9766e50eb931" />
 
-Accepts: email, password, confirm_password
+🛠 Installation & Usage
+1. Make scripts executable:
+chmod +x run_app.sh
+chmod +x run_tests.sh
 
-Validates that the email does not already exist
+2. Run Application or Tests:
+# Start the service
+./run_app.sh
 
-Creates a new user record
-
-Issues a JWT and sets an HTTP-only cookie
-
-Enqueues an asynchronous job to send a welcome email
-
-2. Login
-
-Endpoint behavior
-
-Accepts: email, password
-
-Validates that the email exists and the password is correct
-
-Issues a JWT and sets an HTTP-only cookie
-
-Stores the user session in Redis
-
-3. Silent Login (Session Restoration)
-
-Purpose
-
-Allows users to stay logged in across sessions without re-entering credentials
-
-How it works
-
-Client sends the authentication cookie in the request headers
-
-Server verifies the JWT signature
-
-If valid, the user is authenticated automatically
-
-Token & Session Management
-
-JWT + Cookie
-
-JWT is issued on successful login/signup
-
-Stored in an HTTP-only cookie for security
-
-Redis Usage
-
-Stores userId mapped to the decoded JWT payload
-
-Maintains a blacklist of invalidated tokens
-
-Every token validation request checks Redis to ensure the token is not blacklisted
-
-Security Considerations
-
-Passwords are securely hashed before storage
-
-Tokens are invalidated via Redis blacklisting on logout or forced expiration
-
-HTTP-only cookies prevent client-side JavaScript access
-
-
-To run the shell run_app and run_tests first run 
-    chmod +x run_app.sh/chmod +x run_tests.sh
-as that would allow to run then run 
-    ./run_app.sh or ./run_test.sh
-depending on what you want
+# Run test suite
+./run_tests.sh
