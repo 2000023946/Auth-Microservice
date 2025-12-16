@@ -78,3 +78,10 @@ Passwords are securely hashed before storage
 Tokens are invalidated via Redis blacklisting on logout or forced expiration
 
 HTTP-only cookies prevent client-side JavaScript access
+
+
+To run the shell run_app and run_tests first run 
+    chmod +x run_app.sh/chmod +x run_tests.sh
+as that would allow to run then run 
+    ./run_app.sh or ./run_test.sh
+depending on what you want

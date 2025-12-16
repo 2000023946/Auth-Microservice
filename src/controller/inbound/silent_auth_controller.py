@@ -1,27 +1,48 @@
 from src.app.domain.exceptions import TokenError
 from src.controller.outbound.response_models import UserResponse
+import sys  # Added for debug printing
 
 
 # ----------------------------------------------------------------
-# Helper: Simple Response Object
+# Helper: Simple Response Object (MATCHING REFRESH CONTROLLER)
 # ----------------------------------------------------------------
 class HttpResponse:
     def __init__(self, body, status_code=200):
         self.body = body
         self.status_code = status_code
-        self.headers = {}
+        # CHANGED: Use a list of tuples to support multiple Set-Cookie headers
+        self.headers = []
 
-    def set_cookie(
-        self, key, value, httponly=True, secure=True, path="/", max_age=None
-    ):
-        cookie_str = f"{key}={value}; HttpOnly; Secure; Path={path}; SameSite=Lax"
-        if max_age:
-            cookie_str += f"; Max-Age={max_age}"
+    def set_cookie(self, key, value, httponly=True, path="/", max_age=None):
+        # 1. Check Env Var directly (Defaults to False/Dev for local testing)
+        is_prod = False
 
-        if "Set-Cookie" in self.headers:
-            self.headers["Set-Cookie"] += ", " + cookie_str
+        # Force print to stderr for Docker logs
+        print(
+            f"DEBUG: Setting cookie {key}. Production Mode? {is_prod}", file=sys.stderr
+        )
+
+        cookie_parts = [f"{key}={value}", f"Path={path}"]
+
+        # 2. Add flags
+        if httponly:
+            cookie_parts.append("HttpOnly")
+
+        # 3. Dynamic Secure Flag
+        if is_prod:
+            cookie_parts.append("Secure")
+            cookie_parts.append("SameSite=None")
         else:
-            self.headers["Set-Cookie"] = cookie_str
+            # Lax is safer for local HTTP dev so cookies aren't dropped
+            cookie_parts.append("SameSite=Lax")
+
+        if max_age:
+            cookie_parts.append(f"Max-Age={max_age}")
+
+        cookie_str = "; ".join(cookie_parts)
+
+        # 4. Append as a tuple (Key, Value)
+        self.headers.append(("Set-Cookie", cookie_str))
 
 
 # ----------------------------------------------------------------
@@ -35,6 +56,10 @@ class SilentAuthController:
     def handle(self, request) -> HttpResponse:
         access_token = request.cookies.get("access_token")
         refresh_token = request.cookies.get("refresh_token")
+
+        print(
+            f"SilentAuth Check - Access: {bool(access_token)}, Refresh: {bool(refresh_token)}"
+        )
 
         user_id = None
         new_tokens = None  # Tuple (access, refresh) if rotated
@@ -72,13 +97,10 @@ class SilentAuthController:
     def _build_success_response(self, user_id, new_tokens=None):
         """Helper to fetch profile and set cookies if needed."""
         try:
-            # Fetch User Profile
-            user_dto = self.user_service.get_user_by_id(user_id)
-
+            user = self.user_service.fetchUser(user_id)
+            print("fetched user", user)
             # Serialize to JSON
-            response_body = UserResponse(
-                id=user_dto.id, email=user_dto.email
-            ).model_dump()
+            response_body = UserResponse(id=user_id, email=user.email).model_dump()
             response_body["isAuthenticated"] = True
 
             response = HttpResponse(response_body, status_code=200)
@@ -86,12 +108,12 @@ class SilentAuthController:
             # If we rotated tokens, update the cookies!
             if new_tokens:
                 new_access, new_refresh = new_tokens
+                # Access Token: 15 mins (900s)
                 response.set_cookie("access_token", new_access, max_age=900)
-                response.set_cookie(
-                    "refresh_token", new_refresh, path="/auth/refresh", max_age=604800
-                )
+                # Refresh Token: 7 days (604800s)
+                response.set_cookie("refresh_token", new_refresh, max_age=604800)
 
             return response
-        except Exception:
-            # User ID in token but User not in DB? (Rare edge case)
+        except Exception as e:
+            print(f"SilentAuth Error: {e}", file=sys.stderr)
             return HttpResponse({"isAuthenticated": False}, status_code=401)

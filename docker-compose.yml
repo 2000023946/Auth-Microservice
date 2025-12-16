@@ -3,8 +3,6 @@ version: '3.8'
 services:
   app:
     build: .
-    # FIX 1: Moved 'image' out of 'environment' section
-    # FIX 2: Added a variable for the tag so you can push different versions (defaults to v1)
     image: 2000023946/auth-service:${TAG:-v1}
     container_name: auth_app
     ports:
@@ -13,12 +11,10 @@ services:
       - .env.test
     environment:
       - FLASK_ENV=${FLASK_ENV}
-      # Internal Docker Networking (These must match service names below)
       - DB_HOST=db
       - DB_PORT=3306
       - REDIS_HOST=cache
       - REDIS_PORT=6379
-      # Secrets from .env
       - DB_USER=${DB_USER}
       - DB_PASS=${DB_PASS}
       - DB_NAME=${DB_NAME}
@@ -37,7 +33,6 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_PASS}
       MYSQL_DATABASE: ${DB_NAME}
     ports:
-      # FIX 3: Parameterized the Host Port using .env (3307)
       - "${DB_PORT}:3306"
     volumes:
       - db_data:/var/lib/mysql
@@ -52,5 +47,19 @@ services:
       - "${REDIS_PORT:-6379}:6379"
     restart: always
 
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+
 volumes:
   db_data:
+  prometheus_data:
+  grafana_data:
