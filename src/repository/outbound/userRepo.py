@@ -35,3 +35,8 @@ class UserRepo:
 
         # 2. DB Row -> Domain Object
         return UserMapper.to_domain(row)
+
+    def get_user_by_id(self, id):
+        row = self.sql_executor.execute_read_one("get_user_by_id", (id,))
+
+        return UserMapper.to_domain(row)

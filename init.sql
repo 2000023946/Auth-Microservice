@@ -83,6 +83,31 @@ END //
 DELIMITER ;
 
 
+DROP PROCEDURE IF EXISTS get_user_by_id;
+DELIMITER //
+
+CREATE PROCEDURE get_user_by_id(
+    IN ip_user_id INT
+)
+sp_main: BEGIN
+
+    -- Null check
+    IF ip_user_id IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'user_id is null';
+    END IF;
+
+    -- Fetch user by ID
+    SELECT id AS user_id, email, created_at
+    FROM users
+    WHERE id = ip_user_id
+    LIMIT 1;
+
+    -- If no row returned, the caller (app) can handle "user not found"
+    
+END //
+
+DELIMITER ;
 
 
 

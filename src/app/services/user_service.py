@@ -48,3 +48,13 @@ class UserService:
 
         # 3. Response
         return UserDTO.from_domain(user)
+
+    def fetchUser(self, id):
+        if not id:
+            raise AuthenticationError("Invalid user id")
+        user = self.user_repo.get_user_by_id(id)
+
+        if not user:
+            raise AuthenticationError("Invalid user id")
+
+        return UserDTO.from_domain(user)
