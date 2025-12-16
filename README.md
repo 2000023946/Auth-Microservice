@@ -16,16 +16,19 @@ The service follows a **Hexagonal (Ports & Adapters) Architecture**, ensuring st
 | **Cache**      | `RedisCache` managing session state and JWT JTI blacklisting.                                                                |
 | **Interface**  | Controllers as HTTP entry points with schema-based input validation and consistent JSON serialization.                       |
 
-This architecture keeps business logic isolated from frameworks and infrastructure, enabling secure evolution as the system grows.
+This architecture keeps business logic isolated from frameworks and infrastructure,
+enabling secure evolution as the system grows.
 
-------|---------------|
-| **Domain** | Rich `User` models encapsulating business logic (password hashing, email & password validation). |
-| **Services** | Orchestration layer (`UserService`, `TokenService`) handling workflows such as registration, login, and token rotation. |
+| Layer        | Responsibility |
+|-------------|----------------|
+| **Domain**  | Rich `User` models encapsulating business logic (password hashing, email and password validation). |
+| **Services** | Orchestration layer (`UserService`, `TokenService`) coordinating workflows such as registration, login, and token rotation. |
 | **Repository** | `UserRepo` managing database persistence and credential validation via SQL procedures. |
-| **Cache** | `RedisCache` for session management and JWT JTI blacklisting. |
-| **Interface** | Controllers acting as entry points with schema-based input validation and consistent JSON serialization. |
+| **Cache** | `RedisCache` handling session state and JWT JTI blacklisting. |
+| **Interface** | Controllers acting as HTTP entry points with schema-based input validation and consistent JSON serialization. |
 
-This structure isolates business rules from infrastructure, making the system easy to test, reason about, and evolve.
+This structure isolates business rules from infrastructure, making the system easy to test,
+reason about, and safely evolve over time.
 
 ---
 
