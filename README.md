@@ -59,7 +59,52 @@ These choices reflect security patterns commonly used in production authenticati
 
 ---
 
+## 📈 Scalability & Performance
+
+### Scalability Design
+
+The service is designed to scale horizontally with minimal database contention:
+
+* **Redis as a fast session cache**
+  User session payloads and token metadata are cached in Redis, allowing most authentication flows to avoid hitting the database.
+
+* **Constant-time lookups**
+  Redis provides *O(1)* access for token validation and blacklist checks, while database queries typically incur *O(log n)* costs. This significantly reduces latency under load.
+
+* **Database hits are minimized**
+
+  * **Login**: requires a single database lookup to validate credentials.
+  * **Refresh Token** (highest-frequency endpoint): served entirely from Redis without a database hit.
+  * **Silent Auth**: validates session state using cached payloads, avoiding unnecessary DB access.
+
+* **Refresh-heavy optimization**
+  Since token refresh is expected to be the most frequently called endpoint in real applications, eliminating database dependency here allows the service to scale efficiently as traffic grows.
+
+This design ensures predictable performance as concurrent users increase and enables horizontal scaling behind a load balancer.
+
+---
+
 ## 📊 Observability & Quality
+
+### Metrics & Monitoring
+
+* Real-time request latency and error rates exposed via **Prometheus**
+* Visualized using **Grafana dashboards**
+
+### Load Testing Results
+
+Authentication flows were load tested under concurrent traffic. The following **p95 latencies** were observed:
+
+* **Login**: ~0.5s (single DB lookup + token issuance)
+* **Refresh Token**: ~0.09s (Redis-only path)
+* **Silent Auth**: ~0.15s (Redis validation + lightweight processing)
+
+These results demonstrate the effectiveness of Redis-backed caching in reducing latency on high-frequency endpoints.
+
+<img width="1414" height="529" alt="Load test latency dashboard" src="https://github.com/user-attachments/assets/a200616a-2ea8-4472-bf99-b66bf2124846" />
+<img width="981" height="225" alt="Request throughput under load" src="https://github.com/user-attachments/assets/61f1e8dd-3947-4860-85af-9766e50eb931" />
+
+### Code Quality
 
 ### Metrics & Monitoring
 
