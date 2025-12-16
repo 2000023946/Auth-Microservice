@@ -176,6 +176,32 @@ This structure keeps the system understandable, extensible, and safe to modify a
 
 ---
 
+## 🏗 Infrastructure
+
+The microservice includes a modular Terraform-based IaC component to deploy live infrastructure securely and efficiently:
+
+* **Modular Design**
+Network, Redis cache, Aurora global database, and application servers are implemented as separate modules for reusability across multiple projects or environments.
+
+* **Multi-region Deployment**
+Infrastructure modules can be deployed in multiple regions without repeating code, enabling global scalability and high availability.
+
+* **Private Networking**
+VPC with public and private subnets, along with properly configured security groups, isolates services and enforces secure communication.
+
+* **Global Aurora Database**
+One write cluster with regional read replicas ensures consistency, fault tolerance, and horizontal scalability.
+
+* **Redis Cache**
+Deployed in private subnets to handle session caching and JWT token blacklisting efficiently.
+
+* **Application Servers**
+Auto-scaled EC2 instances running Docker containers behind an Application Load Balancer, providing horizontal scaling and high availability.
+
+For full Terraform module definitions see the /infra directory.
+
+--
+
 ## 📌 Project Goals
 
 This project was built to demonstrate:
