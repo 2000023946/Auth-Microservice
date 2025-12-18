@@ -97,6 +97,7 @@ def flask_adapter(controller, flask_req):
 @app.route("/api/auth/login", methods=["POST"])
 @track_metrics(auth_login_success, auth_login_failure, auth_login_latency)
 def login():
+    print("received the login request")
     return flask_adapter(container.controllers.login, request)
 
 
