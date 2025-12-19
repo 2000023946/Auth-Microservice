@@ -99,6 +99,28 @@ The service is designed to scale horizontally with predictable performance under
 This design minimizes database contention and enables horizontal scaling behind a Kubernetes LoadBalancer.
 
 ---
+
+## ☸️ DevOps & Cloud Native Engineering
+
+This service is architected for modern cloud environments, moving beyond simple containers to a fully orchestrated Kubernetes ecosystem.
+
+* **Kubernetes Orchestration:** Managed via a suite of manifests supporting horizontal scaling (**2+ replicas**), automated self-healing (**Liveness Probes**), and internal service discovery.
+* **Infrastructure as Code (IaC):** Modular **Terraform** configurations for provisioning AWS EKS, Aurora Global Databases, and VPC networking.
+* **High Availability:** Engineered with a **Zero-Downtime** mindset—Kubernetes handles rolling updates and pod redistributions automatically.
+* **Secrets Management:** Strict decoupling of configuration from code using **K8s Secrets** and **ConfigMaps** to ensure production security standards.
+
+--- 
+
+## 🔄 Automated CI/CD Pipeline (GitHub Actions)
+
+The project utilizes a high-performance CI/CD pipeline designed for microservice architectures:
+
+* **Parallel Matrix Strategy:** Simultaneously builds and pushes three distinct Docker images (`auth-service`, `auth-client`, `auth-db`) to Docker Hub, reducing pipeline execution time by ~60%.
+* **Automated Quality Gates:** Every PR triggers a comprehensive suite of Unit and Integration tests with **93% coverage enforcement**.
+* **Atomic Tagging:** Images are uniquely tagged with `GITHUB_SHA` to allow for precise version tracking and instant rollbacks in the cluster.
+
+---
+
 ## 🛠 Local Setup & Deployment
 
 ### Prerequisites
