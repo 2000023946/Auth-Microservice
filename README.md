@@ -21,6 +21,32 @@ enabling secure evolution as the system grows.
 
 ---
 
+## 🌐 Frontend Integration & API Gateway
+
+The project includes a **React frontend** integrated through an **Nginx API Gateway**, demonstrating how the authentication service is consumed in a real browser-based environment.
+
+* **Single-origin deployment**
+
+Nginx serves the frontend and proxies backend requests
+
+Eliminates CORS complexity and environment-specific API URLs
+
+* **API Gateway (BFF) pattern**
+
+* Frontend communicates only with Nginx
+
+Backend services remain private behind the gateway
+
+* **Path-based routing**
+
+/** → Static frontend assets
+
+/api/** → Authentication service via Docker internal networking
+
+This layer cleanly separates UI delivery, request routing, and authentication logic, mirroring production deployment patterns used in modern web systems.
+
+--- 
+
 ## 🚀 Core Workflows (Use Cases)
 
 | Feature           | Description                                                                                                    |
