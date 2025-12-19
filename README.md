@@ -81,6 +81,8 @@ These mechanisms together reflect industry-standard practices used in production
 ## 📈 Scalability & Performance
 
 The service is designed to scale horizontally with predictable performance under load.
+* **Kubernetes Orchestration**  
+  Backend runs with replicas for load balancing and self-healing.
 
 * **Redis-backed session caching**
   User session payloads and token metadata are cached in Redis, avoiding repeated database access.
@@ -94,7 +96,32 @@ The service is designed to scale horizontally with predictable performance under
   * **Refresh Token (highest-frequency endpoint)**: Redis-only path, no database hit
   * **Silent Auth**: Redis-backed validation without unnecessary persistence access
 
-This design minimizes database contention and enables efficient horizontal scaling behind a load balancer.
+This design minimizes database contention and enables horizontal scaling behind a Kubernetes LoadBalancer.
+
+---
+## 🛠 Local Setup & Deployment
+
+### Prerequisites
+
+* Docker Desktop with Kubernetes enabled or Minikube
+* `kubectl` CLI
+
+### Configure Secrets
+
+```bash
+kubectl create secret generic auth-secrets \
+  --from-literal=DB_PASS='your_secure_password' \
+  --from-literal=DB_NAME='auth_db' \
+  --from-literal=JWT_SECRET='your_jwt_secret_key' \
+  --from-literal=DB_USER='root'
+Deploy to Kubernetes
+bash
+Copy code
+./deploy.sh
+Access the Application
+bash
+kubectl port-forward svc/frontend 8080:80
+Visit http://localhost:8080 in your browser
 
 ---
 
