@@ -94,6 +94,12 @@ def flask_adapter(controller, flask_req):
 # ==============================================================================
 
 
+@app.route("/health", methods=["GET"])
+def health_check():
+    # You can later add logic here to check if the DB connection is live
+    return {"status": "healthy"}, 200
+
+
 @app.route("/api/auth/login", methods=["POST"])
 @track_metrics(auth_login_success, auth_login_failure, auth_login_latency)
 def login():
