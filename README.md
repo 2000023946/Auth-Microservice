@@ -106,19 +106,11 @@ This design minimizes database contention and enables horizontal scaling behind 
 * Docker Desktop with Kubernetes enabled or Minikube
 * `kubectl` CLI
 
-### Configure Secrets
-
-```bash
-kubectl create secret generic auth-secrets \
-  --from-literal=DB_PASS='your_secure_password' \
-  --from-literal=DB_NAME='auth_db' \
-  --from-literal=JWT_SECRET='your_jwt_secret_key' \
-  --from-literal=DB_USER='root'
-```
 ### Deploy to Kubernetes
 ```bash
 ./deploy.sh
 ```
+
 Visit **http://localhost:8080** in your browser 
 
 ---
