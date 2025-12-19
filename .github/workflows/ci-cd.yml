@@ -5,12 +5,11 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
-  
+
 jobs:
   test:
     name: Unit and Integrated Tests
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,19 +19,28 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Installs dependencies
+      - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run unit tests
-        run: pytest src/tests/unit
+      - name: Run tests
+        run: |
+          pytest src/tests/unit
+          pytest src/tests/integration
 
-      - name: Run integrated tests
-        run: pytest src/tests/integration
-  
   push-to-dockerhub:
     name: Push to Docker Hub
     needs: test
     runs-on: ubuntu-latest
+    strategy:
+      # This runs all 3 builds at the exact same time in different runners
+      matrix:
+        include:
+          - context: .
+            image: 2000023946/auth-service
+          - context: ./client
+            image: 2000023946/auth-client
+          - context: ./db
+            image: 2000023946/auth-db
 
     steps: 
       - name: Checkout repository
@@ -41,15 +49,87 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: 2000023946 # the repo is public so its okay
+          username: 2000023946
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push Docker image
+      - name: Build and Push
         uses: docker/build-push-action@v5
         with:
-          context: .
-          # The image will be built based on the Dockerfile in your root directory
+          context: ${{ matrix.context }}
           push: true
-          tags: 2000023946/auth-service:latest # this is public so okay to keep here
+          tags: |
+            ${{ matrix.image }}:latest
+            ${{ matrix.image }}:${{ github.sha }}
+
+
+# name: CI/CD pipeline
+
+# on:
+#   push:
+#     branches: ["main"]
+#   pull_request:
+#     branches: ["main"]
+  
+# jobs:
+#   test:
+#     name: Unit and Integrated Tests
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+      
+#       - name: Set up Python
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: "3.12"
+
+#       - name: Installs dependencies
+#         run: pip install -r requirements.txt
+
+#       - name: Run unit tests
+#         run: pytest src/tests/unit
+
+#       - name: Run integrated tests
+#         run: pytest src/tests/integration
+  
+#   push-to-dockerhub:
+#     name: Push to Docker Hub
+#     needs: test
+#     runs-on: ubuntu-latest
+
+#     steps: 
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+
+#       - name: Log in to Docker Hub
+#         uses: docker/login-action@v3
+#         with:
+#           username: 2000023946 # the repo is public so its okay
+#           password: ${{ secrets.DOCKER_PASSWORD }}
+
+#       - name: Build and Push Auth Service
+#         uses: docker/build-push-action@v5
+#         with:
+#           context: .
+#           # The image will be built based on the Dockerfile in your root directory
+#           push: true
+#           tags: 2000023946/auth-service:latest # this is public so okay to keep here
+
+#       - name: Build and Push Auth Client
+#         uses: docker/build-push-action@v5
+#         with:
+#           context: ./client
+#           # The image will be built based on the Dockerfile in your root directory
+#           push: true
+#           tags: 2000023946/auth-client:latest # this is public so okay to keep here
+
+#       - name: Build and Push Auth DB
+#         uses: docker/build-push-action@v5
+#         with:
+#           context: ./db
+#           # The image will be built based on the Dockerfile in your root directory
+#           push: true
+#           tags: 2000023946/auth-db:latest # this is public so okay to keep here
 
       
