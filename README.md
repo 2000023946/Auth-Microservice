@@ -40,7 +40,7 @@ The project includes a **React frontend** integrated through an **Nginx API Gate
 - **Security & Isolation**
   - Backend services remain private
   - No direct browser access to internal services
-
+For more detailed information about the frontend implementation, see `client/README.md`.
 --- 
 
 ## 🚀 Core Workflows (Use Cases)
