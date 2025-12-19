@@ -25,25 +25,21 @@ enabling secure evolution as the system grows.
 
 The project includes a **React frontend** integrated through an **Nginx API Gateway**, demonstrating how the authentication service is consumed in a real browser-based environment.
 
-* **Single-origin deployment**
+- **Reverse Proxy**
+  - Serves the React frontend
+  - Routes `/api/**` requests to backend services
 
-Nginx serves the frontend and proxies backend requests
+- **Single-Origin Architecture**
+  - Frontend and backend exposed under one origin
+  - Eliminates CORS issues in production
 
-Eliminates CORS complexity and environment-specific API URLs
+- **Path-Based Routing**
+  - `/**` → static frontend assets
+  - `/api/**` → authentication microservice (Docker internal network)
 
-* **API Gateway (BFF) pattern**
-
-* Frontend communicates only with Nginx
-
-Backend services remain private behind the gateway
-
-* **Path-based routing**
-
-/** → Static frontend assets
-
-/api/** → Authentication service via Docker internal networking
-
-This layer cleanly separates UI delivery, request routing, and authentication logic, mirroring production deployment patterns used in modern web systems.
+- **Security & Isolation**
+  - Backend services remain private
+  - No direct browser access to internal services
 
 --- 
 
