@@ -114,14 +114,12 @@ kubectl create secret generic auth-secrets \
   --from-literal=DB_NAME='auth_db' \
   --from-literal=JWT_SECRET='your_jwt_secret_key' \
   --from-literal=DB_USER='root'
-Deploy to Kubernetes
-bash
-Copy code
+```
+### Deploy to Kubernetes
+```bash
 ./deploy.sh
-Access the Application
-bash
-kubectl port-forward svc/frontend 8080:80
-Visit http://localhost:8080 in your browser
+```
+Visit **http://localhost:8080** in your browser 
 
 ---
 
