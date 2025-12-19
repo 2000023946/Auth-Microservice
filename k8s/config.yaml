@@ -1,0 +1,10 @@
+
+# configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  DB_USER: "root"
+  DB_NAME: "auth_db"
+  FLASK_ENV: "development"

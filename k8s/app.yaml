@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-app
+spec:
+  replicas: 2 # Let's scale it!
+  selector:
+    matchLabels:
+      app: auth-app
+  template:
+    metadata:
+      labels:
+        app: auth-app
+    spec:
+      containers:
+      - name: auth-app
+        image: 2000023946/auth-service:v1
+        ports:
+        - containerPort: 5000
+        env:
+        - name: DB_HOST
+          value: "db"
+        - name: REDIS_HOST
+          value: "cache"
+        envFrom:
+        - configMapRef:
+            name: app-config
+        - secretRef:
+            name: auth-secrets
+        # Self-healing logic
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+spec:
+  ports:
+    - port: 5000
+  selector:
+    app: auth-app
