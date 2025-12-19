@@ -135,12 +135,6 @@ These results demonstrate the effectiveness of Redis-backed caching on high-freq
 <img width="1414" height="529" alt="Load test latency dashboard" src="https://github.com/user-attachments/assets/a200616a-2ea8-4472-bf99-b66bf2124846" />
 <img width="981" height="225" alt="Request throughput under load" src="https://github.com/user-attachments/assets/61f1e8dd-3947-4860-85af-9766e50eb931" />
 
-### Load Testing
-
-Authentication flows were tested under concurrent load to validate system behavior and latency characteristics.
-
-<img width="1414" height="529" alt="Load test latency dashboard" src="https://github.com/user-attachments/assets/a200616a-2ea8-4472-bf99-b66bf2124846" />
-<img width="981" height="225" alt="Request throughput under load" src="https://github.com/user-attachments/assets/61f1e8dd-3947-4860-85af-9766e50eb931" />
 
 ### Code Quality
 
