@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: auth-app
-        image: 2000023946/auth-service:v1
+        image: 2000023946/auth-service:latest
         ports:
         - containerPort: 5000
         env:

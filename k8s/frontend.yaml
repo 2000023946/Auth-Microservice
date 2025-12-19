@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: 2000023946/auth-frontend:latest
+        image: 2000023946/auth-client:latest
         ports:
         - containerPort: 80
 ---
