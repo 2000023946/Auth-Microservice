@@ -1,145 +1,99 @@
-import pytest
+import unittest
 from unittest.mock import MagicMock, patch
-from mysql.connector import IntegrityError  # type: ignore
-from src.repository.outbound.sqlExecuter import SqlExecutor  # type: ignore
-
-# ----------------------------------------------------------------
-# Fixtures
-# ----------------------------------------------------------------
+from src.repository.outbound.sqlExecuter import UserSQLExecuter
+from src.app.domain.exceptions import EmailAlreadyExistsError
 
 
-@pytest.fixture
-def mock_driver():
-    """
-    Patches the actual MySQL driver so we don't need a running DB.
-    """
-    with patch("mysql.connector.connect") as mock_connect:
-        yield mock_connect
+class TestUserSQLExecuter(unittest.TestCase):
+
+    def setUp(self):
+        # Configuration mock
+        self.db_config = {
+            "host": "localhost",
+            "user": "root",
+            "password": "password",
+            "database": "auth_db",
+        }
+        # Initialize the executer
+        self.executer = UserSQLExecuter(self.db_config)
+
+    @patch("mysql.connector.connect")
+    def test_create_user_success(self, mock_connect):
+        # Arrange
+        mock_conn = MagicMock()
+        mock_cursor = mock_conn.cursor.return_value
+        mock_connect.return_value = mock_conn
+
+        # Mock stored_results for create_user to return the generated ID
+        mock_result = MagicMock()
+        mock_result.fetchone.return_value = ("uuid-123",)
+        mock_cursor.stored_results.return_value = [mock_result]
+
+        # Act
+        result = self.executer.create_user("uuid-123", "test@gt.edu", "hash")
+
+        # Assert
+        mock_cursor.callproc.assert_called_once_with(
+            "create_user", ("uuid-123", "test@gt.edu", "hash")
+        )
+        self.assertEqual(result, None)
+        mock_conn.commit.assert_called_once()
+        mock_conn.close.assert_called_once()
+
+    @patch("mysql.connector.connect")
+    def test_login_user_success(self, mock_connect):
+        # Arrange
+        mock_conn = MagicMock()
+        mock_cursor = mock_conn.cursor.return_value
+        mock_connect.return_value = mock_conn
+
+        # Mock procedure returning (id, password_hash)
+        mock_result = MagicMock()
+        mock_result.fetchone.return_value = ("uuid-456", "$2b$12$hash")
+        mock_cursor.stored_results.return_value = [mock_result]
+
+        # Act
+        result = self.executer.login_user("test@gt.edu")
+
+        # Assert
+        mock_cursor.callproc.assert_called_once_with("login_user", ("test@gt.edu",))
+        self.assertEqual(result["id"], "uuid-456")
+        self.assertEqual(result["password_hash"], "$2b$12$hash")
+
+    @patch("mysql.connector.connect")
+    def test_create_user_duplicate_email(self, mock_connect):
+        # Arrange
+        import mysql.connector
+
+        mock_conn = MagicMock()
+        mock_cursor = mock_conn.cursor.return_value
+        mock_connect.return_value = mock_conn
+
+        # Simulate the MySQL error for duplicate entry (1062)
+        error = mysql.connector.Error("Email already registered")
+        error.errno = 1062
+        mock_cursor.callproc.side_effect = error
+
+        # Act & Assert
+        with self.assertRaises(EmailAlreadyExistsError):
+            self.executer.create_user("uuid", "taken@gt.edu", "hash")
+
+    @patch("mysql.connector.connect")
+    def test_get_user_by_id_not_found(self, mock_connect):
+        # Arrange
+        mock_conn = MagicMock()
+        mock_cursor = mock_conn.cursor.return_value
+        mock_connect.return_value = mock_conn
+
+        # Mock empty results
+        mock_cursor.stored_results.return_value = []
+
+        # Act
+        result = self.executer.get_user_by_id("missing-uuid")
+
+        # Assert
+        self.assertIsNone(result)
 
 
-@pytest.fixture
-def sql_executor():
-    """
-    Initializes the executor with a dummy config.
-    """
-    return SqlExecutor(db_config={"user": "test", "password": "123"})
-
-
-# ----------------------------------------------------------------
-# Write Tests (INSERT / UPDATE)
-# ----------------------------------------------------------------
-
-
-def test_execute_write_commits_transaction(sql_executor, mock_driver):
-    """
-    Scenario: Successful insert.
-    Expected:
-    1. Opens connection.
-    2. Calls Procedure.
-    3. Commits transaction (Crucial!).
-    4. Returns generated ID.
-    5. Closes connection.
-    """
-    # Arrange: Setup Mocks
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-
-    mock_driver.return_value = mock_conn
-    mock_conn.cursor.return_value = mock_cursor
-
-    # Simulate DB returning a "Last Insert ID" of 101
-    mock_result = MagicMock()
-    mock_result.fetchone.return_value = (101,)
-    mock_cursor.stored_results.return_value = [mock_result]
-
-    # Act
-    result_id = sql_executor.execute_write("create_user", ("email@gt", "hash"))
-
-    # Assert
-    # 1. Logic Check
-    assert result_id == 101
-
-    # 2. Driver Check
-    mock_cursor.callproc.assert_called_with("create_user", ("email@gt", "hash"))
-    mock_conn.commit.assert_called_once()  # <--- Critical check for writes
-
-    # 3. Cleanup Check
-    mock_cursor.close.assert_called_once()
-    mock_conn.close.assert_called_once()
-
-
-def test_execute_write_bubbles_integrity_error(sql_executor, mock_driver):
-    """
-    Scenario: Database throws "Duplicate Entry".
-    Expected: Executor allows the error to bubble up (so Repo can catch it).
-    """
-    # Arrange
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_driver.return_value = mock_conn
-    mock_conn.cursor.return_value = mock_cursor
-
-    # Simulate Driver Crash
-    mock_cursor.callproc.side_effect = IntegrityError("Duplicate")
-
-    # Act & Assert
-    with pytest.raises(IntegrityError):
-        sql_executor.execute_write("create_user", ("dupe", "hash"))
-
-    # Cleanup should still happen!
-    mock_cursor.close.assert_called_once()
-    mock_conn.close.assert_called_once()
-
-
-# ----------------------------------------------------------------
-# Read Tests (SELECT)
-# ----------------------------------------------------------------
-
-
-def test_execute_read_one_fetches_data(sql_executor, mock_driver):
-    """
-    Scenario: Successful select.
-    Expected: Returns the raw tuple row.
-    """
-    # Arrange
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_driver.return_value = mock_conn
-    mock_conn.cursor.return_value = mock_cursor
-
-    # Simulate DB returning a row
-    mock_result = MagicMock()
-    mock_result.fetchone.return_value = (1, "found@gt", "hash")
-    mock_cursor.stored_results.return_value = [mock_result]
-
-    # Act
-    row = sql_executor.execute_read_one("login_user", ("found@gt",))
-
-    # Assert
-    assert row == (1, "found@gt", "hash")
-
-    # READS should NOT commit (performance)
-    mock_conn.commit.assert_not_called()
-
-
-def test_execute_read_one_returns_none_if_empty(sql_executor, mock_driver):
-    """
-    Scenario: No user found.
-    Expected: Returns None.
-    """
-    # Arrange
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_driver.return_value = mock_conn
-    mock_conn.cursor.return_value = mock_cursor
-
-    # Simulate Empty Result Set
-    mock_result = MagicMock()
-    mock_result.fetchone.return_value = None
-    mock_cursor.stored_results.return_value = [mock_result]
-
-    # Act
-    row = sql_executor.execute_read_one("login_user", ("ghost",))
-
-    # Assert
-    assert row is None
+if __name__ == "__main__":
+    unittest.main()

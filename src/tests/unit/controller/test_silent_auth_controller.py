@@ -1,5 +1,5 @@
-import pytest  # type: ignore
-from unittest.mock import Mock
+import pytest
+from unittest.mock import Mock, MagicMock
 from src.controller.inbound.silent_auth_controller import SilentAuthController
 from src.app.domain.exceptions import TokenError
 
@@ -19,111 +19,119 @@ def mock_user_service():
 
 
 @pytest.fixture
-def silent_auth_controller(mock_token_service, mock_user_service):
+def controller(mock_token_service, mock_user_service):
     return SilentAuthController(mock_token_service, mock_user_service)
 
 
 # ----------------------------------------------------------------
-# Happy Path Tests
+# Tests
 # ----------------------------------------------------------------
 
 
-def test_silent_auth_valid_access_token(
-    silent_auth_controller, mock_token_service, mock_user_service
+def test_handle_success_with_valid_access_token(
+    controller, mock_token_service, mock_user_service
 ):
     """
-    Scenario: Browser has a valid Access Token.
-    Expected: 200 OK, User returned.
+    Scenario: User provides a valid access token.
+    Expectation: Return user profile, no new cookies set.
     """
     # Arrange
     mock_request = Mock()
-    mock_request.cookies = {"access_token": "valid_access_token"}
+    mock_request.cookies = {"access_token": "valid_jwt"}
 
-    # Mock Token Service
-    mock_token_service.validate_and_get_user_id.return_value = 123
+    mock_token_service.validate_and_get_user_id.return_value = "user-uuid-123"
 
-    # --- FIX 1: Mock the correct method (fetchUser) & explicitly set email ---
-    mock_user = Mock()
-    mock_user.id = 123
-    mock_user.email = "test@gt.edu"
-    mock_user_service.fetchUser.return_value = mock_user
+    user_mock = Mock()
+    user_mock.email = "student@gt.edu"
+    mock_user_service.fetchUser.return_value = user_mock
 
     # Act
-    response = silent_auth_controller.handle(mock_request)
+    response = controller.handle(mock_request)
 
     # Assert
     assert response.status_code == 200
-    # Verify the body content if possible
-    assert response.body["email"] == "test@gt.edu"
+    assert response.body["email"] == "student@gt.edu"
+    assert response.body["isAuthenticated"] is True
+    # Verify no cookies were set because access token was valid
+    assert len(response.headers) == 0
 
 
-def test_silent_auth_expired_access_uses_refresh(
-    silent_auth_controller, mock_token_service, mock_user_service
+def test_handle_success_with_refresh_rotation(
+    controller, mock_token_service, mock_user_service
 ):
     """
-    Scenario: Access Token expired, Refresh Token valid -> Rotation.
+    Scenario: Access token is expired/invalid, but Refresh token is valid.
+    Expectation: New tokens issued via cookies, user profile returned.
     """
     # Arrange
     mock_request = Mock()
     mock_request.cookies = {
-        "access_token": "expired_token",
-        "refresh_token": "valid_refresh",
+        "access_token": "expired_jwt",
+        "refresh_token": "valid_refresh_jwt",
     }
 
-    # 1. Access token fails
+    # Access fails
     mock_token_service.validate_and_get_user_id.side_effect = TokenError("Expired")
+    # Refresh succeeds
+    mock_token_service.refresh_token.return_value = ("new_access", "new_refresh")
+    mock_token_service.get_user_id_from_token.return_value = "user-uuid-456"
 
-    # 2. Refresh logic triggers
-    mock_token_service.refresh_token.return_value = (
-        "new_access_jwt",
-        "new_refresh_jwt",
-    )
-
-    # 3. Get ID from new token
-    mock_token_service.get_user_id_from_token.return_value = 456
-
-    # --- FIX 1 REPEATED: Mock fetchUser correctly ---
-    mock_user = Mock()
-    mock_user.id = 456
-    mock_user.email = "refreshed@gt.edu"
-    mock_user_service.fetchUser.return_value = mock_user
+    user_mock = Mock()
+    user_mock.email = "refresh_user@gt.edu"
+    mock_user_service.fetchUser.return_value = user_mock
 
     # Act
-    response = silent_auth_controller.handle(mock_request)
-
-    # --- FIX 2: Handle Headers as a List of Tuples ---
-    # response.headers is [('Set-Cookie', '...'), ('Set-Cookie', '...')]
-
-    # Helper to find cookies in the list
-    cookies_found = [value for key, value in response.headers if key == "Set-Cookie"]
+    response = controller.handle(mock_request)
 
     # Assert
     assert response.status_code == 200
-    assert len(cookies_found) == 2  # Should have set both Access and Refresh cookies
-    assert "access_token=new_access_jwt" in cookies_found[0]
-    assert "refresh_token=new_refresh_jwt" in cookies_found[1]
+    assert response.body["email"] == "refresh_user@gt.edu"
+
+    # Check that rotation cookies are present in the list of tuples
+    cookie_headers = [val for key, val in response.headers if key == "Set-Cookie"]
+    assert len(cookie_headers) == 2
+    assert "access_token=new_access" in cookie_headers[0]
+    assert "refresh_token=new_refresh" in cookie_headers[1]
 
 
-# ----------------------------------------------------------------
-# Failure Tests
-# ----------------------------------------------------------------
+def test_handle_failure_all_tokens_invalid(controller, mock_token_service):
+    """
+    Scenario: Access token invalid and Refresh token invalid.
+    Expectation: 401 Unauthorized.
+    """
+    # Arrange
+    mock_request = Mock()
+    mock_request.cookies = {"access_token": "bad", "refresh_token": "worse"}
+
+    mock_token_service.validate_and_get_user_id.side_effect = TokenError()
+    mock_token_service.refresh_token.side_effect = TokenError()
+
+    # Act
+    response = controller.handle(mock_request)
+
+    # Assert
+    assert response.status_code == 401
+    assert response.body["isAuthenticated"] is False
 
 
-def test_silent_auth_fails_if_both_tokens_invalid(
-    silent_auth_controller, mock_token_service
+def test_handle_failure_user_service_error(
+    controller, mock_token_service, mock_user_service
 ):
     """
-    Scenario: Access expired AND Refresh expired/blacklisted.
-    Expected: 401 Unauthorized (User must login again).
+    Scenario: Tokens are valid, but database lookup for the user fails.
+    Expectation: 401 Unauthorized (via catch-all in _build_success_response).
     """
+    # Arrange
     mock_request = Mock()
-    mock_request.cookies = {"access_token": "bad", "refresh_token": "bad"}
+    mock_request.cookies = {"access_token": "valid_jwt"}
+    mock_token_service.validate_and_get_user_id.return_value = "123"
 
-    # Both fail
-    mock_token_service.validate_and_get_user_id.side_effect = TokenError("Expired")
-    mock_token_service.refresh_token.side_effect = TokenError("Blacklisted")
+    # Database or logic error
+    mock_user_service.fetchUser.side_effect = Exception("DB Down")
 
-    response = silent_auth_controller.handle(mock_request)
+    # Act
+    response = controller.handle(mock_request)
 
+    # Assert
     assert response.status_code == 401
     assert response.body["isAuthenticated"] is False

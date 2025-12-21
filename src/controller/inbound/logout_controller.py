@@ -1,23 +1,4 @@
-# ----------------------------------------------------------------
-# Helper: Simple Response Object
-# ----------------------------------------------------------------
-class HttpResponse:
-    def __init__(self, body, status_code=200):
-        self.body = body
-        self.status_code = status_code
-        self.headers = {}
-
-    def delete_cookie(self, key, path="/"):
-        """
-        Clears a cookie by setting its value to empty and expiry to immediate.
-        """
-        # Max-Age=0 tells the browser to delete it immediately
-        cookie_str = f"{key}=; HttpOnly; Secure; Path={path}; Max-Age=0; SameSite=Lax"
-
-        if "Set-Cookie" in self.headers:
-            self.headers["Set-Cookie"] += ", " + cookie_str
-        else:
-            self.headers["Set-Cookie"] = cookie_str
+from ..outbound.http import HttpResponse
 
 
 # ----------------------------------------------------------------

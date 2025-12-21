@@ -1,4 +1,4 @@
-import pytest  # type: ignore
+import pytest
 from unittest.mock import Mock
 from src.controller.inbound.register_controller import RegisterController
 from src.app.domain.exceptions import UserDomainValidationError, EmailAlreadyExistsError
@@ -10,11 +10,13 @@ from src.app.domain.exceptions import UserDomainValidationError, EmailAlreadyExi
 
 @pytest.fixture
 def mock_user_service():
+    """Mock of the IUserService interface."""
     return Mock()
 
 
 @pytest.fixture
-def register_controller(mock_user_service):
+def controller(mock_user_service):
+    """RegisterController with the mocked service injected."""
     return RegisterController(mock_user_service)
 
 
@@ -23,90 +25,148 @@ def register_controller(mock_user_service):
 # ----------------------------------------------------------------
 
 
-def test_register_success(register_controller, mock_user_service):
+def test_handle_register_success(controller, mock_user_service):
     """
-    Scenario: Valid input, passwords match.
-    Expected: 201 Created, returns User DTO (no password).
+    Scenario: Valid email and matching passwords.
+    Expected: 201 Created and user profile returned (no password).
     """
     # Arrange
     mock_request = Mock()
     mock_request.json = {
-        "email": "fresh@gt.edu",
-        "pass1": "SecurePass1!",
-        "pass2": "SecurePass1!",
+        "email": "buzz@gatech.edu",
+        "pass1": "PerfectPassword123!",
+        "pass2": "PerfectPassword123!",
     }
 
-    # Mock Service returning a DTO
-    mock_user_service.register.return_value = Mock(id=50, email="fresh@gt.edu")
+    # Mocking the DTO returned by the service
+    mock_dto = Mock()
+    mock_dto.user_id = "uuid-1234"
+    mock_dto.email = "buzz@gatech.edu"
+    mock_user_service.register.return_value = mock_dto
 
     # Act
-    response = register_controller.handle(mock_request)
+    response = controller.handle(mock_request)
 
     # Assert
     assert response.status_code == 201
-    assert response.body["email"] == "fresh@gt.edu"
-    assert response.body["id"] == 50
-    assert "pass" not in response.body  # No passwords in response!
+    assert response.body["id"] == "uuid-1234"
+    assert response.body["email"] == "buzz@gatech.edu"
+    # Ensure UserResponse is working (Pydantic model_dump)
+    assert "password" not in response.body
 
 
 # ----------------------------------------------------------------
-# Validation Errors (Schema & Logic)
+# Pydantic Schema Validation (ValueError)
 # ----------------------------------------------------------------
 
 
-def test_register_fails_password_mismatch(register_controller):
+def test_handle_register_pydantic_mismatch(controller):
     """
-    Scenario: pass1 != pass2.
-    Expected: 400 Bad Request (Caught by Pydantic Schema).
+    Scenario: Passwords do not match in the JSON payload.
+    Expected: 400 Bad Request (Caught via ValueError from model_validator).
     """
     # Arrange
     mock_request = Mock()
-    mock_request.json = {"email": "mismatch@gt.edu", "pass1": "PassA", "pass2": "PassB"}
+    mock_request.json = {
+        "email": "student@gatech.edu",
+        "pass1": "PassA",
+        "pass2": "PassB",
+    }
 
     # Act
-    response = register_controller.handle(mock_request)
+    response = controller.handle(mock_request)
 
     # Assert
     assert response.status_code == 400
-    assert "match" in str(response.body["error"])
+    assert "Passwords do not match" in str(response.body["error"])
 
 
-def test_register_fails_email_taken(register_controller, mock_user_service):
+def test_handle_register_invalid_email(controller):
     """
-    Scenario: Email already exists in DB.
+    Scenario: Email format is invalid.
+    Expected: 400 Bad Request (Caught via Pydantic EmailStr).
+    """
+    # Arrange
+    mock_request = Mock()
+    mock_request.json = {
+        "email": "not-an-email",
+        "pass1": "Pass123!",
+        "pass2": "Pass123!",
+    }
+
+    # Act
+    response = controller.handle(mock_request)
+
+    # Assert
+    assert response.status_code == 400
+    # Pydantic's EmailStr error message contains "value is not a valid email address"
+    assert "email" in str(response.body["error"])
+
+
+# ----------------------------------------------------------------
+# Domain & Infrastructure Errors
+# ----------------------------------------------------------------
+
+
+def test_handle_register_email_exists(controller, mock_user_service):
+    """
+    Scenario: Email is valid but already taken in the DB.
     Expected: 409 Conflict.
     """
     # Arrange
     mock_request = Mock()
-    mock_request.json = {"email": "taken@gt.edu", "pass1": "Pass1!", "pass2": "Pass1!"}
-
-    # Mock Service throwing the Domain Exception
+    mock_request.json = {
+        "email": "existing@gatech.edu",
+        "pass1": "Pass123!",
+        "pass2": "Pass123!",
+    }
     mock_user_service.register.side_effect = EmailAlreadyExistsError("Email taken")
 
     # Act
-    response = register_controller.handle(mock_request)
+    response = controller.handle(mock_request)
 
     # Assert
     assert response.status_code == 409
-    assert "taken" in str(response.body["error"])
+    assert "Email taken" in response.body["error"]
 
 
-def test_register_fails_weak_password(register_controller, mock_user_service):
+def test_handle_register_weak_password(controller, mock_user_service):
     """
-    Scenario: Password violates Domain rules (too short).
-    Expected: 400 Bad Request (Bubbled up from Domain Layer).
+    Scenario: Passwords match, but Domain Service rejects it (e.g., too short).
+    Expected: 400 Bad Request.
     """
     # Arrange
     mock_request = Mock()
-    mock_request.json = {"email": "weak@gt.edu", "pass1": "123", "pass2": "123"}
-
+    mock_request.json = {"email": "user@gatech.edu", "pass1": "123", "pass2": "123"}
     mock_user_service.register.side_effect = UserDomainValidationError(
         "Password too weak"
     )
 
     # Act
-    response = register_controller.handle(mock_request)
+    response = controller.handle(mock_request)
 
     # Assert
     assert response.status_code == 400
-    assert "too weak" in str(response.body["error"])
+    assert "too weak" in response.body["error"]
+
+
+def test_handle_register_unexpected_crash(controller, mock_user_service):
+    """
+    Scenario: Unexpected code crash or DB connection failure.
+    Expected: 500 Internal Server Error.
+    """
+    # Arrange
+    mock_request = Mock()
+    mock_request.json = {
+        "email": "user@gatech.edu",
+        "pass1": "Pass123!",
+        "pass2": "Pass123!",
+    }
+    mock_user_service.register.side_effect = Exception("Sudden DB death")
+
+    # Act
+    response = controller.handle(mock_request)
+
+    # Assert
+    assert response.status_code == 500
+    assert response.body["error"] == "Internal Server Error"

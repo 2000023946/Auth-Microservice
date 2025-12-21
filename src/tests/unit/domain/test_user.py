@@ -1,4 +1,6 @@
-import pytest  # type: ignore
+import pytest
+from uuid import UUID
+from datetime import date
 from src.app.domain.user import User
 from src.app.domain.exceptions import UserDomainValidationError
 
@@ -10,33 +12,32 @@ from src.app.domain.exceptions import UserDomainValidationError
 def test_create_user_success():
     """
     Scenario: Valid email and matching strong passwords.
-    Expected: User object is created, password is hashed (not plain text).
+    Expected: User object is created with plain text password (hashing happens in Mapper).
     """
-    email = "test@gatech.edu"
+    email = "mohamed@gatech.edu"
     pass1 = "SecurePass123!"
-    pass2 = "SecurePass123!"
 
     # Act
-    user = User.create(email, pass1, pass2)
+    user = User.create(email, pass1, pass1)
 
     # Assert
     assert user.email == email
-    assert user.password_hash != pass1  # Must be hashed
-    assert user.password_hash.startswith("$2b$")  # Bcrypt standard prefix
+    assert user.password == pass1  # In Pure Domain, we keep the raw string
+    assert isinstance(user.user_id, UUID)
+    assert user.createdAt == date.today()
 
-    assert user.id is None
 
-
-def test_verify_password_check():
+def test_user_is_immutable():
     """
-    Scenario: User is created. We check if the password verification works.
-    Expected: Returns True for correct password, False for wrong one.
+    Scenario: Attempting to change an attribute on a frozen dataclass.
+    Expected: Raises FrozenInstanceError.
     """
-    user = User.create("test@gatech.edu", "Secret123!", "Secret123!")
+    user = User.create("test@gatech.edu", "Password123!", "Password123!")
 
-    # Act & Assert
-    assert user.verify_password("Secret123!") is True
-    assert user.verify_password("WrongPass!") is False
+    with pytest.raises(
+        AttributeError
+    ):  # dataclasses.FrozenInstanceError inherits from AttributeError
+        user.email = "new@gatech.edu"
 
 
 # ----------------------------------------------------------------
@@ -50,32 +51,61 @@ def test_create_user_mismatch_passwords():
     Expected: Raises UserDomainValidationError.
     """
     with pytest.raises(UserDomainValidationError) as exc:
-        User.create("test@gatech.edu", "PassA", "PassB")
+        User.create("test@gatech.edu", "Password123!", "Different123!")
 
     assert "Passwords do not match" in str(exc.value)
 
 
-def test_create_user_invalid_email_format():
+def test_create_user_null_inputs():
     """
-    Scenario: Email is missing '@' or domain.
+    Scenario: Passing None for required fields.
     Expected: Raises UserDomainValidationError.
     """
-    invalid_emails = ["plainaddress", "@missingusername.com", "username@.com.my"]
+    with pytest.raises(UserDomainValidationError) as exc:
+        User.create(None, "Pass123!", "Pass123!")
 
-    for email in invalid_emails:
-        with pytest.raises(UserDomainValidationError) as exc:
-            User.create(email, "Pass123!", "Pass123!")
-        assert "Invalid email format" in str(exc.value)
+    assert "Domain inputs cannot be null" in str(exc.value)
 
 
-def test_create_user_weak_password():
+@pytest.mark.parametrize(
+    "invalid_email", ["plainaddress", "@missingusername.com", "username@.com.my", ""]
+)
+def test_create_user_invalid_email_format(invalid_email):
     """
-    Scenario: Password is too short or simple (based on your rules).
-    Expected: Raises UserDomainValidationError.
+    Scenario: Various invalid email formats.
     """
-    weak_passwords = ["123", "short", "onlyletters"]
+    with pytest.raises(UserDomainValidationError) as exc:
+        User.create(invalid_email, "Pass123!", "Pass123!")
 
-    for pwd in weak_passwords:
-        with pytest.raises(UserDomainValidationError) as exc:
-            User.create("test@gatech.edu", pwd, pwd)
-        assert "Password is too weak" in str(exc.value)
+    assert "Invalid email format" in str(exc.value) or "Email cannot be null" in str(
+        exc.value
+    )
+
+
+@pytest.mark.parametrize(
+    "weak_pwd", ["1234567", "onlyletters", ""]  # Too short  # No numbers  # Empty
+)
+def test_create_user_weak_password(weak_pwd):
+    """
+    Scenario: Password fails complexity rules.
+    """
+    with pytest.raises(UserDomainValidationError) as exc:
+        User.create("test@gatech.edu", weak_pwd, weak_pwd)
+
+    assert "Password is too weak" in str(
+        exc.value
+    ) or "Password cannot be empty" in str(exc.value)
+
+
+# ----------------------------------------------------------------
+# 3. Property & Method Tests
+# ----------------------------------------------------------------
+
+
+def test_user_id_string_property():
+    """
+    Check if the helper property returns the string version of UUID.
+    """
+    user = User.create("test@gatech.edu", "Pass123!", "Pass123!")
+    assert isinstance(user.get_user_id, str)
+    assert len(user.get_user_id) == 36  # Standard UUID length

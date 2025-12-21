@@ -1,52 +1,50 @@
 import re
-import bcrypt  # type: ignore
 from src.app.domain.exceptions import UserDomainValidationError
+from uuid import uuid4, UUID
+from dataclasses import dataclass, field
+from datetime import datetime, date
 
 
+@dataclass(frozen=True)
 class User:
-    def __init__(self, email, password_hash, id=None):
-        self.email = email
-        self.password_hash = password_hash
-        self.id = None
+    """
+    Pure Domain User Model. It only contains the logic based on how each attribute should be defined.
+    And it contains the logic of how the attributes should behave with each other. It contains all the
+    validation needed for the use cases for the login and register.
+    """
+
+    email: str
+    password: str
+    user_id: UUID = field(default_factory=uuid4)
+    createdAt: datetime = field(default_factory=date.today)
 
     @classmethod
-    def create(cls, email, p1, p2):
+    def create(cls, email: str, p1: str, p2: str):
         """Factory method to validate input and create a User instance."""
         # 1. Check Matching Passwords
+        if email is None or p1 is None or p2 is None:
+            raise UserDomainValidationError("Domain inputs cannot be null")
+
         if p1 != p2:
             raise UserDomainValidationError("Passwords do not match")
 
-        # 2. Validate Formats (calls the static methods below)
-        cls.validate_email(email)
-        cls.validate_password(p1)
-
-        # 3. Hash Password (bcrypt requires bytes, returns bytes, so we decode to string)
-        hashed_str = cls.create_hashed_password(p1)
+        cls.validate_credentials(email, p1)
 
         # 4. Return new Instance
-        return cls(email=email, password_hash=hashed_str, id=id)
+        return cls(email=email, password=p1)
 
     @classmethod
-    def retrieve(cls, email, pass_hash, id):
-        # 2. Validate Formats (calls the static methods below)
+    def validate_credentials(
+        cls,
+        email: str,
+        password: str,
+    ) -> bool:
+        """Checks if the stored password matches the current password"""
+
         cls.validate_email(email)
+        cls.validate_password(password)
 
-        # 3. Hash Password (bcrypt requires bytes, returns bytes, so we decode to string)
-        user_retrieved = cls(email=email, password_hash=pass_hash)
-        user_retrieved.setId(id)
-        return user_retrieved
-
-    @classmethod
-    def create_hashed_password(self, password):
-        hashed_bytes = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
-        return hashed_bytes.decode("utf-8")
-
-    def verify_password(self, plain_password) -> bool:
-        """Checks if the plain password matches the stored hash."""
-        # bcrypt.checkpw requires bytes for both arguments
-        return bcrypt.checkpw(
-            plain_password.encode("utf-8"), self.password_hash.encode("utf-8")
-        )
+        return True
 
     @staticmethod
     def validate_email(email):
@@ -75,15 +73,10 @@ class User:
             )
         return True
 
-    def setId(self, id: str):
-        print("settings id of ", id)
-        if not id:
-            raise UserDomainValidationError("Id cannot be null")
+    @property
+    def get_user_id(self) -> str:
+        return str(self.user_id)
 
-        try:
-            id = int(id)
-        except (TypeError, ValueError):
-            raise UserDomainValidationError("Id must be int type!")
-
-        self.id = id
-        return self
+    @property
+    def get_created_date(self) -> str:
+        return str(self.createdAt)

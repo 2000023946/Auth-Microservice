@@ -215,7 +215,7 @@ def test_login_rejects_bad_password():
     # Act: Try wrong password
     response = requests.post(
         f"{BASE_URL}/login",
-        json={"email": "hacker@gt.edu", "password": "WRONG_PASSWORD"},
+        json={"email": "hacker@gt.edu", "password": "WRONG_PASSWORD4"},
     )
 
     # Assert

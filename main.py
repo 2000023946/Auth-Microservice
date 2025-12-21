@@ -110,6 +110,7 @@ def login():
 @app.route("/api/auth/register", methods=["POST"])
 @track_metrics(auth_register_success, auth_register_failure, auth_register_latency)
 def register():
+    print("request got")
     return flask_adapter(container.controllers.register, request)
 
 

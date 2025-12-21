@@ -2,6 +2,7 @@ from src.components.infrastructure_component import InfrastructureComponent
 from src.components.repository_component import RepositoryComponent
 from src.components.service_component import ServiceComponent
 from src.components.controller_component import ControllerComponent
+from src.app.services.hashing_service import BcryptHasher
 
 
 class AppContainer:
@@ -13,6 +14,7 @@ class AppContainer:
 
     def __init__(self):
         self.infrastructure = InfrastructureComponent()
+
         self.repositories = RepositoryComponent(self.infrastructure)
         self.services = ServiceComponent(
             self.repositories,

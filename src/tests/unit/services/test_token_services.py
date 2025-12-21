@@ -1,149 +1,153 @@
-import pytest  # type: ignore
+import pytest
 from unittest.mock import Mock, ANY
-import jwt  # type: ignore
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from src.app.services.token_service import TokenService
 from src.app.domain.exceptions import TokenError
-from datetime import timezone
 
 # ----------------------------------------------------------------
-# Test Config
+# Test Fixtures
 # ----------------------------------------------------------------
-TEST_SECRET = "super_secret_key_for_testing"
 
 
 @pytest.fixture
 def mock_redis():
-    """Mocks the RedisCache layer."""
+    """Mocks the ICache interface."""
     return Mock()
 
 
 @pytest.fixture
-def token_service(mock_redis):
-    """Initializes Service with the Mock Redis and a Test Secret."""
-    return TokenService(redis_cache=mock_redis, secret_key=TEST_SECRET)
+def mock_provider():
+    """Mocks the ITokenAdapter (The JWT Infrastructure)."""
+    return Mock()
+
+
+@pytest.fixture
+def token_service(mock_redis, mock_provider):
+    """Initializes Service with mocked infrastructure."""
+    return TokenService(redis_cache=mock_redis, token_provider=mock_provider)
 
 
 # ----------------------------------------------------------------
-# 1. Create JWT Tests (Login)
+# 1. Create Token Tests
 # ----------------------------------------------------------------
 
 
-def test_create_jwt_returns_pair(token_service):
+def test_create_jwt_success(token_service, mock_provider):
     """
-    Scenario: User logs in.
-    Expected: Returns a tuple (access_token, refresh_token).
+    Scenario: Successful login.
+    Expected: Service generates payloads and delegates signing to provider.
     """
     user_id = 123
+    # Setup mock behavior for the two calls (Access then Refresh)
+    mock_provider.encode.side_effect = ["access_token_str", "refresh_token_str"]
 
     # Act
     access, refresh = token_service.create_jwt(user_id)
 
-    # Assert - They must be strings
-    assert isinstance(access, str)
-    assert isinstance(refresh, str)
+    # Assert
+    assert access == "access_token_str"
+    assert refresh == "refresh_token_str"
 
-    # Assert - Payloads must be correct
-    access_payload = jwt.decode(access, TEST_SECRET, algorithms=["HS256"])
-    refresh_payload = jwt.decode(refresh, TEST_SECRET, algorithms=["HS256"])
-
-    assert access_payload["sub"] == str(user_id)
-    assert access_payload["type"] == "access"
-
-    assert refresh_payload["sub"] == str(user_id)
-    assert refresh_payload["type"] == "refresh"
-
-    # Assert - JTIs must be unique
-    assert access_payload["jti"] != refresh_payload["jti"]
+    # Verify the service sent the correct user_id to the provider
+    assert mock_provider.encode.call_count == 2
+    # Check first call (Access Token)
+    first_call_args = mock_provider.encode.call_args_list[0][0][0]
+    assert first_call_args["sub"] == str(user_id)
+    assert first_call_args["type"] == "access"
 
 
 # ----------------------------------------------------------------
 # 2. Refresh Token Tests (Rotation)
 # ----------------------------------------------------------------
-def test_refresh_token_success(token_service, mock_redis):
+
+
+def test_refresh_token_rotation_success(token_service, mock_redis, mock_provider):
     """
-    Scenario: Valid refresh token is provided.
-    Expected:
-    1. Checks if old token is blacklisted.
-    2. Blacklists the OLD token.
-    3. Returns a NEW access token AND a NEW refresh token.
+    Scenario: Valid refresh token is used.
+    Expected: Old token blacklisted, new pair generated.
     """
     # Arrange
-    user_id = 456
-    old_token = token_service._generate_token(user_id, "refresh")
+    old_token_str = "valid_old_refresh_token"
+    # Set expiration to 1 hour in the future
+    future_exp = datetime.now(timezone.utc).timestamp() + 3600
+
+    mock_provider.decode.return_value = {
+        "sub": "456",
+        "type": "refresh",
+        "jti": "old-jti-123",
+        "exp": future_exp,
+    }
     mock_redis.is_blacklisted.return_value = False
+    mock_provider.encode.side_effect = ["new_access", "new_refresh"]
 
     # Act
-    # FIX: Unpack the tuple into two variables
-    new_access, new_refresh = token_service.refresh_token(old_token)
+    new_access, new_refresh = token_service.refresh_token(old_token_str)
 
     # Assert
-    mock_redis.is_blacklisted.assert_called_once()
+    # 1. Check blacklist was consulted
+    mock_redis.is_blacklisted.assert_called_with("old-jti-123")
+    # 2. Check old token was added to blacklist
     mock_redis.blacklist_token.assert_called_once()
-
-    # Verify Access Token
-    payload_access = jwt.decode(new_access, TEST_SECRET, algorithms=["HS256"])
-    assert payload_access["sub"] == str(user_id)
-    assert payload_access["type"] == "access"
-
-    # Verify Refresh Token (The Service now returns this too!)
-    payload_refresh = jwt.decode(new_refresh, TEST_SECRET, algorithms=["HS256"])
-    assert payload_refresh["sub"] == str(user_id)
-    assert payload_refresh["type"] == "refresh"
+    # 3. Check new pair was issued
+    assert new_access == "new_access"
+    assert new_refresh == "new_refresh"
 
 
-def test_refresh_fails_if_blacklisted(token_service, mock_redis):
+def test_refresh_fails_if_blacklisted(token_service, mock_redis, mock_provider):
     """
-    Scenario: Token reuse attack (Hacker uses an old refresh token).
-    Expected: Raises TokenError.
+    Scenario: Attacker tries to reuse a rotated token.
     """
-    # Arrange
-    old_token = token_service._generate_token(user_id=1, token_type="refresh")
-
-    # Mock Redis saying "YES, this is blacklisted"
+    mock_provider.decode.return_value = {
+        "sub": "1",
+        "type": "refresh",
+        "jti": "stolen-jti",
+        "exp": 9999999999,
+    }
     mock_redis.is_blacklisted.return_value = True
 
-    # Act & Assert
     with pytest.raises(TokenError, match="Token is blacklisted"):
-        token_service.refresh_token(old_token)
+        token_service.refresh_token("stolen_token")
 
 
-def test_refresh_fails_if_expired(token_service):
+def test_refresh_fails_on_wrong_token_type(token_service, mock_provider):
     """
-    Scenario: Refresh token is too old.
-    Expected: Raises TokenError (ExpiredSignature).
+    Scenario: User sends an Access token to the refresh endpoint.
     """
-    # Arrange: Manually forge an expired token
-    expired_payload = {
-        "sub": 1,
-        "type": "refresh",
-        "exp": datetime.now(timezone.utc) - timedelta(days=1),  # Past
-    }
-    bad_token = jwt.encode(expired_payload, TEST_SECRET, algorithm="HS256")
+    mock_provider.decode.return_value = {"type": "access", "sub": "1"}
 
-    # Act & Assert
-    with pytest.raises(TokenError, match="expired"):
-        token_service.refresh_token(bad_token)
+    with pytest.raises(TokenError, match="Invalid token type"):
+        token_service.refresh_token("access_token_acting_as_refresh")
 
 
 # ----------------------------------------------------------------
-# 3. Logout Tests
+# 3. Logout & Security Tests
 # ----------------------------------------------------------------
 
 
-def test_logout_blacklists_token(token_service, mock_redis):
+def test_logout_calculates_correct_ttl(token_service, mock_redis, mock_provider):
     """
-    Scenario: User logs out.
-    Expected: The token JTI is added to Redis.
+    Scenario: Logout occurs.
+    Expected: Redis is called with the remaining TTL of the token.
     """
     # Arrange
-    token = token_service._generate_token(user_id=999, token_type="refresh")
-    decoded = jwt.decode(token, TEST_SECRET, algorithms=["HS256"])
-    jti = decoded["jti"]
+    now_ts = datetime.now(timezone.utc).timestamp()
+    token_exp = now_ts + 500  # 500 seconds left
+    mock_provider.decode.return_value = {"jti": "logout-jti", "exp": token_exp}
 
     # Act
-    token_service.logout(token)
+    token_service.logout("active_token")
 
     # Assert
-    # Verify we sent the specific JTI to Redis
-    mock_redis.blacklist_token.assert_called_with(jti, ANY)
+    # We use pytest.approx because time moves forward slightly during the test
+    mock_redis.blacklist_token.assert_called_with(
+        "logout-jti", pytest.approx(500, abs=1)
+    )
+
+
+def test_validate_user_id_success(token_service, mock_provider):
+    """Checks the helper used by the API to identify users."""
+    mock_provider.decode.return_value = {"type": "access", "sub": "789"}
+
+    uid = token_service.validate_and_get_user_id("valid_access_token")
+
+    assert uid == str(789)
