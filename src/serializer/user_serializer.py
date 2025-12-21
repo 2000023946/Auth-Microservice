@@ -1,2 +1,0 @@
-class UserSerializer:
-    pass

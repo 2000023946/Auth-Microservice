@@ -11,7 +11,7 @@ class UserResponse(BaseModel):
     Strictly excludes sensitive fields like 'password_hash'.
     """
 
-    id: int
+    id: str
     email: EmailStr
 
     # OLD WAY (Deprecated):

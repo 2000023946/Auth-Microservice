@@ -8,5 +8,9 @@ class UserRepoBase(ABC):
         pass
 
     @abstractmethod
-    def validate_user(self, user: User):
+    def validate_credentials(self, email: str, password: str):
+        pass
+
+    @abstractmethod
+    def get_user_by_id(self, id: str):
         pass

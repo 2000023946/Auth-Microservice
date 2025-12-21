@@ -1,8 +1,10 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import date
 
 
 @dataclass
 class UserDB:
-    id: int | None
+    id: str
     email: str
     password_hash: str
+    created_at: date = field(default_factory=date.today)

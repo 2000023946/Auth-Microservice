@@ -1,7 +1,7 @@
-from ..inbound.cache import Cache
+from ..inbound.cache import ICache
 
 
-class RedisCache(Cache):
+class RedisCache(ICache):
     def __init__(self, redis_client):
         """
         Dependency Injection: Pass in the configured redis.Redis() client.

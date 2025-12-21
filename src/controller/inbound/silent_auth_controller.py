@@ -1,48 +1,7 @@
 from src.app.domain.exceptions import TokenError
 from src.controller.outbound.response_models import UserResponse
 import sys  # Added for debug printing
-
-
-# ----------------------------------------------------------------
-# Helper: Simple Response Object (MATCHING REFRESH CONTROLLER)
-# ----------------------------------------------------------------
-class HttpResponse:
-    def __init__(self, body, status_code=200):
-        self.body = body
-        self.status_code = status_code
-        # CHANGED: Use a list of tuples to support multiple Set-Cookie headers
-        self.headers = []
-
-    def set_cookie(self, key, value, httponly=True, path="/", max_age=None):
-        # 1. Check Env Var directly (Defaults to False/Dev for local testing)
-        is_prod = False
-
-        # Force print to stderr for Docker logs
-        print(
-            f"DEBUG: Setting cookie {key}. Production Mode? {is_prod}", file=sys.stderr
-        )
-
-        cookie_parts = [f"{key}={value}", f"Path={path}"]
-
-        # 2. Add flags
-        if httponly:
-            cookie_parts.append("HttpOnly")
-
-        # 3. Dynamic Secure Flag
-        if is_prod:
-            cookie_parts.append("Secure")
-            cookie_parts.append("SameSite=None")
-        else:
-            # Lax is safer for local HTTP dev so cookies aren't dropped
-            cookie_parts.append("SameSite=Lax")
-
-        if max_age:
-            cookie_parts.append(f"Max-Age={max_age}")
-
-        cookie_str = "; ".join(cookie_parts)
-
-        # 4. Append as a tuple (Key, Value)
-        self.headers.append(("Set-Cookie", cookie_str))
+from ..outbound.http import HttpResponse
 
 
 # ----------------------------------------------------------------
@@ -101,6 +60,7 @@ class SilentAuthController:
             print("fetched user", user)
             # Serialize to JSON
             response_body = UserResponse(id=user_id, email=user.email).model_dump()
+            print(response_body, "response body ")
             response_body["isAuthenticated"] = True
 
             response = HttpResponse(response_body, status_code=200)
