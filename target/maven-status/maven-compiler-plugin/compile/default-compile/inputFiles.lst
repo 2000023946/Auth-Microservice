@@ -1,0 +1,13 @@
+/Users/momoabucar/Desktop/auth/target/generated-sources/openapi/src/main/java/com/authservice/infrastructure/web/dto/ErrorResponse.java
+/Users/momoabucar/Desktop/auth/target/generated-sources/openapi/src/main/java/com/authservice/infrastructure/web/dto/AccessTokenResponse.java
+/Users/momoabucar/Desktop/auth/target/generated-sources/openapi/src/main/java/com/authservice/infrastructure/web/dto/MfaRequest.java
+/Users/momoabucar/Desktop/auth/src/main/java/com/authservice/domain/model/valueobjects/ValueObject.java
+/Users/momoabucar/Desktop/auth/target/generated-sources/openapi/src/main/java/com/authservice/infrastructure/web/dto/AuthResponse.java
+/Users/momoabucar/Desktop/auth/target/generated-sources/openapi/src/main/java/com/authservice/infrastructure/web/dto/ForgotPasswordRequest.java
+/Users/momoabucar/Desktop/auth/target/generated-sources/openapi/src/main/java/com/authservice/infrastructure/web/dto/MessageResponse.java
+/Users/momoabucar/Desktop/auth/target/generated-sources/openapi/src/main/java/com/authservice/infrastructure/web/dto/LoginRequest.java
+/Users/momoabucar/Desktop/auth/target/generated-sources/openapi/src/main/java/com/authservice/infrastructure/web/api/ApiApi.java
+/Users/momoabucar/Desktop/auth/target/generated-sources/openapi/src/main/java/com/authservice/infrastructure/web/dto/RegisterRequest.java
+/Users/momoabucar/Desktop/auth/target/generated-sources/openapi/src/main/java/com/authservice/infrastructure/web/api/ApiUtil.java
+/Users/momoabucar/Desktop/auth/target/generated-sources/openapi/src/main/java/com/authservice/infrastructure/web/dto/UserResponse.java
+/Users/momoabucar/Desktop/auth/target/generated-sources/openapi/src/main/java/com/authservice/infrastructure/web/dto/ResetPasswordRequest.java

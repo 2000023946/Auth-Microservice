@@ -58,7 +58,7 @@ CREATE PROCEDURE login_user(
     IN ip_email VARCHAR(255)
 )
 sp_main: BEGIN
-    SELECT id, password_hash
+    SELECT *
     FROM users
     WHERE email = LOWER(ip_email)
     LIMIT 1;
@@ -75,7 +75,7 @@ CREATE PROCEDURE get_user_by_id(
     IN ip_user_id CHAR(36)
 )
 sp_main: BEGIN
-    SELECT email, created_at
+    SELECT *
     FROM users
     WHERE id = ip_user_id
     LIMIT 1;

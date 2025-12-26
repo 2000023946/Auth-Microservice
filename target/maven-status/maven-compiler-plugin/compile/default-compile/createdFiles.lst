@@ -1,0 +1,12 @@
+com/authservice/infrastructure/web/dto/MessageResponse.class
+com/authservice/infrastructure/web/dto/RegisterRequest.class
+com/authservice/infrastructure/web/dto/ResetPasswordRequest.class
+com/authservice/infrastructure/web/dto/MfaRequest.class
+com/authservice/infrastructure/web/dto/ErrorResponse.class
+com/authservice/infrastructure/web/dto/AuthResponse.class
+com/authservice/infrastructure/web/api/ApiApi.class
+com/authservice/infrastructure/web/api/ApiUtil.class
+com/authservice/infrastructure/web/dto/UserResponse.class
+com/authservice/infrastructure/web/dto/LoginRequest.class
+com/authservice/infrastructure/web/dto/ForgotPasswordRequest.class
+com/authservice/infrastructure/web/dto/AccessTokenResponse.class
