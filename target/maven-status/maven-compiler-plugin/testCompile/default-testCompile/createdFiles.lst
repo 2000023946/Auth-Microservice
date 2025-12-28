@@ -1,1 +1,12 @@
-com/authservice/domain/ports/HashingService.class
+com/authservice/domain/model/aggregates/MFATokenAggregateTest.class
+com/authservice/domain/model/valueobjects/PasswordValueObjectTest.class
+com/authservice/domain/model/aggregates/PasswordResetTokenAggregateTest.class
+com/authservice/domain/model/valueobjects/IPAddressValueObjectTest.class
+com/authservice/domain/model/valueobjects/EmailTest.class
+com/authservice/domain/model/aggregates/SessionAggregateTest.class
+com/authservice/domain/model/valueobjects/MFACodeValueObjectTest.class
+com/authservice/domain/model/aggregates/VerificationTokenAggregateTest.class
+com/authservice/domain/model/aggregates/AccessTokenAggregateTest.class
+com/authservice/domain/model/valueobjects/UUIDValueObjectTest.class
+com/authservice/domain/model/valueobjects/PasswordValueObjectTest$ComplexityFailures.class
+com/authservice/domain/model/aggregates/RefreshTokenAggregateTest.class

@@ -41,7 +41,7 @@ import java.util.Map;
 import java.util.Optional;
 import jakarta.annotation.Generated;
 
-@Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2025-12-26T00:03:44.423679-05:00[America/New_York]")
+@Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2025-12-27T19:02:17.923228-05:00[America/New_York]")
 @Validated
 @Tag(name = "Authentication", description = "Auth & identity endpoints")
 public interface ApiApi {

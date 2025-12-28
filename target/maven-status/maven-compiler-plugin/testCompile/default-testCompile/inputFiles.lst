@@ -1,1 +1,17 @@
+/Users/momoabucar/Desktop/auth/src/test/java/com/authservice/domain/model/aggregates/RefreshTokenAggregateTest.java
+/Users/momoabucar/Desktop/auth/src/test/java/com/authservice/domain/model/valueobjects/PasswordValueObjectTest.java
+/Users/momoabucar/Desktop/auth/src/test/java/com/authservice/domain/model/services/CredentialValidationServiceTest.java
 /Users/momoabucar/Desktop/auth/src/test/java/com/authservice/domain/model/valueobjects/testEmailValueObject.java
+/Users/momoabucar/Desktop/auth/src/test/java/com/authservice/domain/model/entities/UserLoginInformationTest.java
+/Users/momoabucar/Desktop/auth/src/test/java/com/authservice/domain/model/valueobjects/MFACodeValueObjectTest.java
+/Users/momoabucar/Desktop/auth/src/test/java/com/authservice/domain/model/aggregates/MFATokenAggregateTest.java
+/Users/momoabucar/Desktop/auth/src/test/java/com/authservice/domain/model/valueobjects/PasswordHashValueObjectTest.java
+/Users/momoabucar/Desktop/auth/src/test/java/com/authservice/domain/model/aggregates/VerificationTokenAggregateTest.java
+/Users/momoabucar/Desktop/auth/src/test/java/com/authservice/domain/model/aggregates/PasswordResetTokenAggregateTest.java
+/Users/momoabucar/Desktop/auth/src/test/java/com/authservice/domain/model/aggregates/SessionAggregateTest.java
+/Users/momoabucar/Desktop/auth/src/test/java/com/authservice/domain/model/aggregates/AccessTokenAggregateTest.java
+/Users/momoabucar/Desktop/auth/src/test/java/com/authservice/domain/model/valueobjects/UserAgentValueObjectTest.java
+/Users/momoabucar/Desktop/auth/src/test/java/com/authservice/domain/model/valueobjects/IPAddressValueObjectTest.java
+/Users/momoabucar/Desktop/auth/src/test/java/com/authservice/domain/model/valueobjects/UUIDValueObjectTest.java
+/Users/momoabucar/Desktop/auth/src/test/java/com/authservice/domain/ports/IHashingService.java
+/Users/momoabucar/Desktop/auth/src/test/java/com/authservice/domain/model/aggregates/UserAggregateTest.java

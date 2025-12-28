@@ -1,0 +1,26 @@
+===========================================================
+AUTH-SERVICE: DOMAIN LAYER DESIGN SPECIFICATION
+===========================================================
+
+This domain layer follows a "Strict Capsule" Hexagonal Architecture. 
+The goal is zero-trust: we never assume input data is valid.
+
+1. THE COMPONENT HIERARCHY
+   [Raw Data] -> [Factory] -> [Value Objects] -> [Aggregate]
+
+2. SECURITY THROUGH VISIBILITY
+   - Aggregates: All constructors are PACKAGE-PRIVATE. 
+   - Factories: All creation methods are PUBLIC.
+   Result: It is physically impossible to create an Aggregate 
+   without going through a Factory.
+
+3. PERSISTENCE PATTERN ("DB Returns String")
+   Our factories support a .reconstitute() method. This method 
+   accepts raw Strings from SQL or Redis and parses them into 
+   Domain Types. If the database is corrupted, the Factory 
+   will throw an exception before the domain logic executes.
+
+4. PORT DEPENDENCY INJECTION
+   For complex Value Objects (Passwords, UserAgents), we use 
+   Ports (Interfaces). The Domain defines the Port; the 
+   Infrastructure implements it. The Factory orchestrates them.
