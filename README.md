@@ -19,6 +19,7 @@ The service follows a **Hexagonal (Ports & Adapters) Architecture**, ensuring st
 This architecture keeps business logic isolated from frameworks and infrastructure,
 enabling secure evolution as the system grows.
 <img width="1169" height="548" alt="Screenshot 2026-01-01 at 9 45 31 AM" src="https://github.com/user-attachments/assets/c2b0af1e-f009-4309-8202-987f522ccfe9" />
+<img width="1047" height="352" alt="Screenshot 2026-01-01 at 9 48 59 AM" src="https://github.com/user-attachments/assets/2bed2f70-9c3a-4991-b9c4-bfa9de090f74" />
 
 ---
 
